@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "tiny-tales",
+    "name": "Tiny Tales",
     "slug": "tiny-tales",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,9 +18,11 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.pixel5urfer.tinytales"
+      "package": "com.pixel5urfer.tinytales",
+      "versionCode": 12
     },
     "web": {
       "output": "static",
@@ -31,7 +33,10 @@
       [
         "expo-build-properties",
         {
-          "android": { "kotlinVersion": "2.2.0" }
+          "android": {
+            "allowBackup": true,
+            "kotlinVersion": "2.2.0"
+          }
         }
       ],
       "expo-router",
@@ -55,7 +60,9 @@
         }
       ],
       "expo-secure-store",
-      "react-native-iap"
+      "react-native-iap",
+      "expo-web-browser",
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,7 +1,4 @@
-// src/utils/OfflineThoughts.js
-// Label-less offline fallback thoughts (UK tone). Keep them short for the bubble.
-
-const OFFLINE_THOUGHTS = [
+const OFFLINE_THOUGHTS  = [
     "I definitely meant to do that, and if you think otherwise, that’s between you and your imagination. 😌",
     "If this is a test, I’m failing it with confidence and a concerning amount of style. 🙃",
     "I’m not lost, I’m just taking the scenic route and pretending it was intentional. 👀",
@@ -93,11 +90,12 @@ const OFFLINE_THOUGHTS = [
     "I’m here, I’m coping, and that’s enough for now. 🫶"
 ];
 
-
-// Small helper
 export function pickOfflineThought() {
     return OFFLINE_THOUGHTS[Math.floor(Math.random() * OFFLINE_THOUGHTS.length)];
 }
 
-// Optional: export full list if you ever want to show “offline pack”
+// Optional default export (handy if you ever import default)
+export default pickOfflineThought;
+
+// Optional list export
 export { OFFLINE_THOUGHTS };

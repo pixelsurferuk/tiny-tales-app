@@ -1,475 +1,266 @@
-// app/preview.js
-import React, {useEffect, useRef, useState, useCallback} from "react";
-import {useLocalSearchParams, router, useFocusEffect} from "expo-router";
-import {View, Image, StyleSheet, Pressable, Text, ActivityIndicator, Alert, Platform} from "react-native";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
+import { View, Image, StyleSheet, Text, ActivityIndicator, Alert, Platform, Share } from "react-native";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
-import {captureRef} from "react-native-view-shot";
-import * as SecureStore from "expo-secure-store";
-import {devAddProCredits} from "../src/services/credits";
-import {PreviewBannerAd} from "../src/ads/admob";
-import SpeechBubble from "../src/components/SpeechBubble";
-import {classifyImage, getThought, getProThought, getStatus, pingServer} from "../src/services/ai";
-import {pickOfflineThought} from "../src/utils/OfflineThoughts";
-import {SafeAreaView} from "react-native-safe-area-context";
-import {StatusBar} from "expo-status-bar";
-import {Ionicons} from "@expo/vector-icons";
+import { captureRef } from "react-native-view-shot";
+import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 
-async function setAndroidNavBarDark() {
-    if (Platform.OS !== "android") return;
+import Screen from "../src/components/ui/Screen";
+import TTButton from "../src/components/ui/TTButton";
+import ShareCaptionBar from "../src/components/ui/ShareCaptionBar";
+import { useTTTheme } from "../src/theme";
+import { AppBannerAd } from "../src/ads/admob";
+import SpeechBubble from "../src/components/ui/SpeechBubble";
+import ThoughtBottomBar from "../src/components/ui/ThoughtBottomBar";
+import { getThoughtFromServer } from "../src/services/ai";
+import { getAccessToken } from "../src/services/auth";
+import { makeImageDataUrlPro } from "../src/services/imageDataUrl";
+import { getActivePet, summarizePetForPrompt } from "../src/services/pets";
+import { pickOfflineThought } from "../src/utils/OfflineThoughts";
+import { parseCreditsFromResponse } from "../src/utils/credits";
+import { setAndroidNavBarStyle } from "../src/utils/navBar";
+import { useEntitlements } from "../src/state/entitlements";
+import { CREDIT_ERROR_CODES } from "../src/config";
 
-    try {
-        const mod = await import("expo-navigation-bar");
-        const Nav = mod?.default ?? mod;
-
-        if (!Nav?.setButtonStyleAsync) {
-            console.warn("NavigationBar loaded but setButtonStyleAsync is missing.");
-            return;
-        }
-
-        // ✅ Edge-to-edge friendly: set icon colour only
-        await Nav.setButtonStyleAsync("light"); // light icons
-    } catch (e) {
-        console.warn("NavigationBar not available:", e?.message || e);
-    }
+function pickParamString(v) {
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) return typeof v[0] === "string" ? v[0] : null;
+    return null;
 }
 
-// ✅ Stable device id
-async function getOrCreateDeviceId() {
-    const KEY = "tiny_tales_device_id";
-
-    // 👇 DEV: force stable id
-    const forced = "dev_jamie";
-    await SecureStore.setItemAsync(KEY, forced);
-    return forced;
-
-    // Production version:
-    // const existing = await SecureStore.getItemAsync(KEY);
-    // if (existing) return existing;
-    // const fresh = `tt_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    // await SecureStore.setItemAsync(KEY, fresh);
-    // return fresh;
-}
-
-function TopIconButton({icon, label, onPress, disabled}) {
-    return (
-        <Pressable
-            onPress={onPress}
-            disabled={disabled}
-            style={({pressed}) => [
-                styles.topIconBtn,
-                pressed && !disabled && styles.topIconBtnPressed,
-                disabled && styles.topIconBtnDisabled,
-            ]}
-            hitSlop={10}
-        >
-            <Ionicons name={icon} size={22} color="#fff"/>
-            <Text style={styles.topIconLabel} numberOfLines={1}>
-                {label}
-            </Text>
-        </Pressable>
-    );
-}
+const makeStyles = (t) =>
+    StyleSheet.create({
+        container: { flex: 1 },
+        exportWrap: { flex: 1, flexDirection: "column" },
+        imageWrap: { flex: 1 },
+        image: { width: "100%", height: "100%", resizeMode: "cover" },
+        bubblePos: { position: "absolute", top: 20, left: 20, right: 20, alignItems: "flex-start" },
+        mainButtons: { flexDirection: "row", gap: 10 },
+        busyRow: {
+            position: "absolute",
+            left: 10,
+            right: 10,
+            bottom: 20,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "#FFFFFF",
+            padding: 10,
+            borderRadius: 12,
+            shadowColor: "#000",
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 6,
+        },
+        busyText: { fontSize: 16, lineHeight: 22, textAlign: "center", color: "#2E2E2E", fontWeight: "400" },
+    });
 
 export default function Preview() {
     const params = useLocalSearchParams();
-    const uri = params?.uri;
-    const wasOnlineAtCapture = params?.online === "1";
+    const t = useTTTheme();
+    const styles = useMemo(() => makeStyles(t), [t]);
 
-    const [deviceId, setDeviceId] = useState(null);
+    const { deviceId: identityId, isPro, server, refreshAll, setCreditsLocal } = useEntitlements();
+
+    const uri = pickParamString(params?.uri);
+    const fromProfiles = pickParamString(params?.src) === "profiles";
 
     const [thought, setThought] = useState("…");
-    const [label, setLabel] = useState(null);
-
-    const [remainingPro, setRemainingPro] = useState(null);
-
     const [thinking, setThinking] = useState(false);
     const [thinkingStage, setThinkingStage] = useState("");
-
+    const [checkingAccess, setCheckingAccess] = useState(true);
     const [busy, setBusy] = useState(false);
-    const [mediaPerm] = MediaLibrary.usePermissions({writeOnly: true});
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [showCaption, setShowCaption] = useState(false);
+    const [serverOnline, setServerOnline] = useState(true);
+    const [adRefresh, setAdRefresh] = useState(0);
+    const [activePet, setActivePet] = useState(null);
 
+    const [mediaPerm] = MediaLibrary.usePermissions({ writeOnly: true });
     const cardRef = useRef(null);
     const thinkingRef = useRef(false);
+    const autoRequestedRef = useRef(false);
+    const proDataUrlRef = useRef(null);
 
-    const [adRefresh, setAdRefresh] = useState(0);
-    const isPro = false;
-
-    // ✅ Server status: OFFLINE only when ping says so
-    const [serverOnline, setServerOnline] = useState(wasOnlineAtCapture);
-
-    // -----------------------------
-    // Smart Thought Nudge (non-intrusive)
-    // -----------------------------
-    const SMART_NUDGE_KEY = "tt_smart_nudge_dismissed";
-    const [smartNudgeDismissed, setSmartNudgeDismissed] = useState(false);
-    const [showSmartNudge, setShowSmartNudge] = useState(false);
-    const smartNudgeTimerRef = useRef(null);
-
-    const clearSmartNudgeTimer = () => {
-        if (smartNudgeTimerRef.current) {
-            clearTimeout(smartNudgeTimerRef.current);
-            smartNudgeTimerRef.current = null;
-        }
-    };
-
-    const showSmartNudgeOnce = useCallback(() => {
-       // if (smartNudgeDismissed) return;
-        if (!serverOnline) return; // no point nudging when offline
-
-        setShowSmartNudge(true);
-        clearSmartNudgeTimer();
-        smartNudgeTimerRef.current = setTimeout(() => setShowSmartNudge(false), 8000)
-    }, [smartNudgeDismissed, serverOnline]);
+    useEffect(() => { setAndroidNavBarStyle("light"); }, []);
 
     useEffect(() => {
-        (async () => {
-            try {
-                const v = await SecureStore.getItemAsync(SMART_NUDGE_KEY);
-                setSmartNudgeDismissed(v === "1");
-            } catch {
-                // ignore
-            }
-        })();
+        proDataUrlRef.current = null;
+        autoRequestedRef.current = false;
+        setCheckingAccess(true);
+        setImageLoaded(false);
+    }, [uri]);
 
-        return () => {
-            clearSmartNudgeTimer();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // --- helpers ---
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
-
-    const showStage = useCallback(async (text, minMs = 0) => {
-        setThinkingStage(text);
-        await nextFrame();
-        if (minMs > 0) await sleep(minMs);
-    }, []);
-
-    const showOfflineThought = useCallback(() => {
-        setThought(pickOfflineThought());
-        setLabel(null);
-        setServerOnline(false);
-        setShowSmartNudge(false);
-    }, []);
-
-    const preflight = useCallback(async () => {
-        await showStage("Checking connection...", 150);
-        const ok = await pingServer();
-        setServerOnline(ok);
-        return ok;
-    }, [showStage]);
-
-    const openStore = useCallback(() => {
-        router.push("/buy-credits");
-    }, []);
-
-    const onDevAdd = useCallback(async () => {
-        if (!deviceId) {
-            Alert.alert("No device id yet", "Try again in a second.");
-            return;
-        }
+    const refreshActivePet = useCallback(async () => {
         try {
-            const r = await devAddProCredits(deviceId, 5);
-            if (typeof r?.remainingPro === "number") setRemainingPro(r.remainingPro);
-            //Alert.alert("Dev credits added ✅", `You now have ${r?.remainingPro ?? "?"} smart thoughts.`);
+            setActivePet(await getActivePet() || null);
         } catch (e) {
-            Alert.alert("Dev add failed", String(e?.message || e));
+            console.warn("[preview] getActivePet failed", e?.message || e);
+            setActivePet(null);
         }
-    }, [deviceId]);
-
-    useEffect(() => {
-        setAndroidNavBarDark();
     }, []);
 
-    // 1b) Refresh credits whenever this screen is focused again (e.g. after buying)
     useFocusEffect(
         useCallback(() => {
-            let active = true;
-
-            (async () => {
-                try {
-                    if (!deviceId) return;
-
-                    const ok = await pingServer();
-                    if (!active) return;
-
-                    setServerOnline(ok);
-
-                    if (!ok) {
-                        setRemainingPro(null);
-                        return;
-                    }
-
-                    const s = await getStatus(deviceId);
-                    if (!active) return;
-
-                    if (typeof s?.remainingPro === "number") setRemainingPro(s.remainingPro);
-                } catch (e) {
-                    console.warn("focus status refresh failed", e);
-                }
-            })();
-
-            return () => {
-                active = false;
-            };
-        }, [deviceId])
+            refreshActivePet();
+            refreshAll({ reason: "preview_focus", retries: 1, delayMs: 300 });
+        }, [refreshActivePet, refreshAll])
     );
 
-    // 1) Device id + status (only if online)
     useEffect(() => {
         let cancelled = false;
-
         (async () => {
+            if (!uri || !identityId) {
+                if (!cancelled) setCheckingAccess(false);
+                return;
+            }
             try {
-                const id = await getOrCreateDeviceId();
-                if (cancelled) return;
-                setDeviceId(id);
-
-                const ok = await pingServer();
-                if (cancelled) return;
-                setServerOnline(ok);
-
-                if (ok) {
-                    const s = await getStatus(id);
-                    if (cancelled) return;
-                    if (typeof s?.remainingPro === "number") setRemainingPro(s.remainingPro);
-                } else {
-                    setRemainingPro(null);
+                setCheckingAccess(true);
+                const result = await refreshAll({ reason: "preview_access_check", retries: 1, delayMs: 200 });
+                const remaining = result?.status?.creditsRemaining ?? server?.creditsRemaining ?? null;
+                if (!cancelled && !isPro && remaining !== null && remaining <= 0) {
+                    router.replace({ pathname: "/paywall", params: { source: "thoughts" } });
                 }
             } catch (e) {
-                console.warn("status init failed", e);
-                if (!cancelled) {
-                    setServerOnline(false);
-                    setRemainingPro(null);
-                }
+                console.warn("[preview] access check failed", e?.message || e);
+            } finally {
+                if (!cancelled) setCheckingAccess(false);
             }
         })();
+        return () => { cancelled = true; };
+    }, [uri, identityId, isPro, refreshAll]);
 
-        return () => {
-            cancelled = true;
-        };
-    }, []);
+    const redirectToPaywall = useCallback((creditPatch) => {
+        if (creditPatch) {
+            const parsed = parseCreditsFromResponse(creditPatch);
+            if (Object.values(parsed).some((v) => typeof v === "number")) {
+                setCreditsLocal(parsed);
+            }
+        }
+        router.replace({ pathname: "/paywall", params: { source: "thoughts" } });
+    }, [setCreditsLocal]);
 
-    // 2) FIRST LOAD: classify + first thought (unless offline)
-    useEffect(() => {
-        let cancelled = false;
-
-        (async () => {
+    const runSmartThought = useCallback(
+        async ({ auto = false } = {}) => {
             if (!uri) return;
+            if (!identityId) {
+                if (!auto) Alert.alert("Missing identity", "Try again in a second.");
+                return;
+            }
+            if (thinkingRef.current || checkingAccess) return;
+
+            try {
+                if (!isPro) {
+                    setCheckingAccess(true);
+                    let remaining = server?.creditsRemaining ?? null;
+                    if (remaining === null) {
+                        const result = await refreshAll({ reason: "preview_precheck", retries: 1, delayMs: 250 });
+                        remaining = result?.status?.creditsRemaining ?? server?.creditsRemaining ?? null;
+                    }
+                    if (remaining !== null && remaining <= 0) {
+                        redirectToPaywall(null);
+                        return;
+                    }
+                }
+            } finally {
+                setCheckingAccess(false);
+            }
 
             thinkingRef.current = true;
             setThinking(true);
 
             try {
-                const ok = await preflight();
-                if (cancelled) return;
+                setThinkingStage("Preparing…");
+                // Parallelise image processing and auth token fetch
+                if (!proDataUrlRef.current) {
+                    const [dataUrl] = await Promise.all([
+                        makeImageDataUrlPro(uri),
+                        getAccessToken().catch(() => null),
+                    ]);
+                    proDataUrlRef.current = dataUrl;
+                }
 
-                if (!ok) {
-                    showOfflineThought();
+                setThinkingStage("Thinking…");
+                const r = await getThoughtFromServer({
+                    imageDataUrl: proDataUrlRef.current,
+                    identityId,
+                    pet: summarizePetForPrompt(activePet),
+                });
+
+                setServerOnline(true);
+
+                if (!r?.ok) {
+                    if (CREDIT_ERROR_CODES.has(r?.error)) {
+                        redirectToPaywall(r);
+                        return;
+                    }
+                    if(__DEV__) Alert.alert("Thought Error", "Couldn't generate a thought.");
                     return;
                 }
 
-                await showStage("Looking at the photo...", 300);
-
-                let c = null;
-                try {
-                    c = await classifyImage(uri);
-                } catch (e) {
-                    console.warn("classify failed while online", e);
-                    c = null;
-                }
-
-                if (cancelled) return;
-
-                const nextLabel = c?.ok && c?.label ? c.label : null;
-                setLabel(nextLabel);
-
-                await showStage("Thinking...", 250);
-
-                if (!nextLabel) {
-                    setThought("I can’t tell what I’m looking at… but I’m judging it anyway. 👀");
-                    // Still can nudge Smart Thought (it's about quality), but only if online
-                    showSmartNudgeOnce();
-                    return;
-                }
-
-                const r = await getThought(nextLabel);
-                if (cancelled) return;
-
-                await showStage("Crafting response...", 180);
-
+                setThinkingStage("Crafting response…");
                 setThought(r?.thought || pickOfflineThought());
-                setAdRefresh((n) => n + 1);
 
-                // ✅ Show a gentle nudge after first successful thought
-                showSmartNudgeOnce();
+                const patch = parseCreditsFromResponse(r);
+                if (Object.values(patch).some((v) => typeof v === "number")) {
+                    setCreditsLocal(patch);
+                } else if (!isPro) {
+                    await refreshAll({ reason: "smart_thought_spend", retries: 1, delayMs: 250 });
+                }
+
+                setAdRefresh((n) => n + 1);
             } catch (e) {
-                console.warn(e);
-                if (!cancelled) showOfflineThought();
+                console.warn("[preview] smart thought error", e?.message, e?.status, e?.data || e);
+                const errCode = e?.data?.error;
+                if (CREDIT_ERROR_CODES.has(errCode)) {
+                    redirectToPaywall(e?.data);
+                    return;
+                }
+                setServerOnline(false);
+                setThought(pickOfflineThought());
             } finally {
                 thinkingRef.current = false;
-                if (!cancelled) {
-                    setThinking(false);
-                    setThinkingStage("");
-                }
+                setThinking(false);
+                setThinkingStage("");
             }
+        },
+        [uri, identityId, activePet, isPro, server?.creditsRemaining, refreshAll,
+            setCreditsLocal, redirectToPaywall, checkingAccess]
+    );
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            if (!uri || !identityId || checkingAccess || autoRequestedRef.current) return;
+            autoRequestedRef.current = true;
+            if (!cancelled) await runSmartThought({ auto: true });
         })();
+        return () => { cancelled = true; };
+    }, [uri, identityId, checkingAccess, runSmartThought]);
 
-        return () => {
-            cancelled = true;
-        };
-    }, [uri, preflight, showStage, showOfflineThought, showSmartNudgeOnce]);
-
-    // Button: New Thought
-    const runThought = useCallback(async () => {
-        if (thinkingRef.current) return;
-
-        thinkingRef.current = true;
-        setThinking(true);
-
-        try {
-            const ok = await preflight();
-            if (!ok) {
-                showOfflineThought();
-                return;
-            }
-
-            let nextLabel = label;
-            if (!nextLabel && uri) {
-                await showStage("Looking again...", 250);
-                const c = await classifyImage(uri).catch(() => null);
-                nextLabel = c?.ok && c?.label ? c.label : null;
-                setLabel(nextLabel);
-            }
-
-            if (!nextLabel) {
-                Alert.alert("Couldn’t detect", "Try another photo (clearer face/pet).");
-                return;
-            }
-
-            await showStage("Thinking...", 240);
-            const r = await getThought(nextLabel);
-
-            await showStage("Crafting response...", 160);
-            setThought(r?.thought || pickOfflineThought());
-            setAdRefresh((n) => n + 1);
-
-            // ✅ Nudge after they use Basic Thought (once)
-            showSmartNudgeOnce();
-        } catch (e) {
-            console.warn(e);
-            showOfflineThought();
-        } finally {
-            thinkingRef.current = false;
-            setThinking(false);
-            setThinkingStage("");
-        }
-    }, [preflight, showOfflineThought, showStage, label, uri, showSmartNudgeOnce]);
-
-    // Button: Smart Thought
-    const runProThought = useCallback(async () => {
-        if (thinkingRef.current) return;
-
-        // ✅ Dismiss nudge forever once they try Smart Thought
-        setShowSmartNudge(false);
-        if (!smartNudgeDismissed) {
-            setSmartNudgeDismissed(true);
-            SecureStore.setItemAsync(SMART_NUDGE_KEY, "1").catch(() => {
-            });
-        }
-
-        thinkingRef.current = true;
-        setThinking(true);
-
-        try {
-            const ok = await preflight();
-            if (!ok) {
-                showOfflineThought();
-                return;
-            }
-
-            if (deviceId) {
-                const s = await getStatus(deviceId).catch(() => null);
-                if (s?.ok && typeof s.remainingPro === "number") setRemainingPro(s.remainingPro);
-            }
-
-            let nextLabel = label;
-            if (!nextLabel && uri) {
-                await showStage("Looking again...", 250);
-                const c = await classifyImage(uri).catch(() => null);
-                nextLabel = c?.ok && c?.label ? c.label : null;
-                setLabel(nextLabel);
-            }
-
-            if (!nextLabel) {
-                Alert.alert("Couldn’t detect", "Try another photo (clearer face/pet).");
-                return;
-            }
-
-            await showStage("Reading the scene more closely...", 250);
-            const r = await getProThought(nextLabel, uri, deviceId);
-
-            if (!r?.ok) {
-                if (r?.error === "PRO_LIMIT_REACHED") {
-                   /* Alert.alert("Out of Smart Thoughts", "Smart Thoughts use extra context to make the punchline better. Want more?", [
-                        {text: "Not now", style: "cancel"},
-                        {text: "Buy", onPress: openStore},
-                    ]);*/
-                    openStore()
-                    return;
-                }
-                Alert.alert("Pro Error", "Couldn’t generate a smart thought.");
-                return;
-            }
-
-            await showStage("Polishing punchline...", 150);
-
-            setThought(r?.thought || pickOfflineThought());
-            if (typeof r.remainingPro === "number") setRemainingPro(r.remainingPro);
-
-            setAdRefresh((n) => n + 1);
-        } catch (e) {
-            console.warn(e);
-            showOfflineThought();
-        } finally {
-            thinkingRef.current = false;
-            setThinking(false);
-            setThinkingStage("");
-        }
-    }, [
-        preflight,
-        showOfflineThought,
-        showStage,
-        deviceId,
-        label,
-        uri,
-        openStore,
-        smartNudgeDismissed,
-    ]);
-
-    // --- Export / Share / Download ---
     async function exportComposite() {
         try {
             setBusy(true);
-
             if (!cardRef.current) {
                 Alert.alert("Export failed", "Preview view not ready yet.");
                 return null;
             }
-
-            const exportedUri = await captureRef(cardRef.current, {
-                format: "png",
-                quality: 1,
-                result: "tmpfile",
-            });
-
-            return exportedUri;
+            if (!imageLoaded) {
+                Alert.alert("Export failed", "Image is still loading, try again in a moment.");
+                return null;
+            }
+            setShowCaption(true);
+            await new Promise((resolve) => setTimeout(resolve, 150));
+            const result = await captureRef(cardRef.current, { format: "png", quality: 1, result: "tmpfile" });
+            setShowCaption(false);
+            return result;
         } catch (e) {
             console.warn(e);
-            Alert.alert("Export failed", "Couldn’t generate the image. Try again.");
+            setShowCaption(false);
+            Alert.alert("Export failed", "Couldn't generate the image. Try again.");
             return null;
         } finally {
             setBusy(false);
@@ -479,23 +270,23 @@ export default function Preview() {
     async function onShare() {
         const exportedUri = await exportComposite();
         if (!exportedUri) return;
-
-        const available = await Sharing.isAvailableAsync();
-        if (!available) {
-            Alert.alert("Sharing not available", "Sharing isn’t available on this device.");
-            return;
+        try {
+            if (Platform.OS === "ios") {
+                await Share.share({ url: exportedUri });
+            } else {
+                await Sharing.shareAsync(exportedUri, { mimeType: "image/png", dialogTitle: "Share Tiny Tales" });
+            }
+        } catch (e) {
+            console.warn("Share error:", e);
+            Alert.alert("Share failed", "Could not open share options.");
         }
-
-        await Sharing.shareAsync(exportedUri);
     }
 
     async function onDownload() {
         const exportedUri = await exportComposite();
         if (!exportedUri) return;
-
         try {
             setBusy(true);
-
             if (!mediaPerm?.granted) {
                 const res = await MediaLibrary.requestPermissionsAsync(true);
                 if (!res.granted) {
@@ -503,271 +294,84 @@ export default function Preview() {
                     return;
                 }
             }
-
             await MediaLibrary.saveToLibraryAsync(exportedUri);
             Alert.alert("Saved", "Saved to your gallery.");
         } catch (e) {
             console.warn(e);
-            Alert.alert("Save failed", "Couldn’t save to gallery.");
+            Alert.alert("Save failed", "Couldn't save to gallery.");
         } finally {
             setBusy(false);
         }
     }
 
-    const disableButtons = busy || thinking;
+    const disableButtons = busy || thinking || checkingAccess;
 
     return (
         <>
-            <StatusBar style="light"/>
-            <SafeAreaView style={{flex: 1, backgroundColor: "#1e1f27"}} edges={["top", "bottom"]}>
+            <StatusBar style={t.isDark ? "light" : "dark"} />
+            <Screen style={{ backgroundColor: t.colors.bg }} edges={["top", "bottom"]}>
                 <View style={styles.container}>
-                    <View style={styles.ad}>
-                        <PreviewBannerAd enabled={!isPro} refreshKey={`${uri}-${adRefresh}`}/>
-                    </View>
+                    <AppBannerAd enabled={!isPro} refreshKey={`${uri}-${adRefresh}`} />
 
                     <View ref={cardRef} collapsable={false} style={styles.exportWrap}>
-                        <Image source={{uri}} style={styles.image}/>
+                        <View style={styles.imageWrap}>
+                            {uri ? (
+                                <Image
+                                    source={{ uri }}
+                                    style={styles.image}
+                                    onLoad={() => setImageLoaded(true)}
+                                />
+                            ) : (
+                                <View style={[styles.image, { backgroundColor: "#111" }]} />
+                            )}
 
-                        <View style={styles.bubblePos}>
-                            <SpeechBubble text={thought || "…"}/>
+                            <View style={styles.bubblePos}>
+                                <SpeechBubble text={thought || "…"} />
+                            </View>
+
+                            {checkingAccess ? (
+                                <View style={styles.busyRow}>
+                                    <ActivityIndicator style={{ marginRight: 8 }} />
+                                    <Text style={styles.busyText}>Checking credits…</Text>
+                                </View>
+                            ) : thinking ? (
+                                <View style={styles.busyRow}>
+                                    <ActivityIndicator style={{ marginRight: 8 }} />
+                                    <Text style={styles.busyText}>{thinkingStage || "Thinking..."}</Text>
+                                </View>
+                            ) : !serverOnline ? (
+                                <View style={styles.busyRow}>
+                                    <Text style={styles.busyText}>Offline</Text>
+                                </View>
+                            ) : null}
                         </View>
 
-                        {thinking ? (
-                            <View style={styles.busyRow}>
-                                <ActivityIndicator style={{ marginRight: 8 }} />
-                                <Text style={styles.busyText}>{thinkingStage || "Thinking..."}</Text>
-                            </View>
-                        ) : !serverOnline ? (
-                            <View style={styles.busyRow}>
-                                <Text style={styles.busyText}>Offline</Text>
-                            </View>
-                        ) : null}
-
-                        {/* 👇 Non-intrusive Smart Thought nudge (tap to trigger Smart or open store if 0) */}
-                        {showSmartNudge && serverOnline && (
-                            <Pressable
-                                onPress={() => {
-                                    if (typeof remainingPro === "number" && remainingPro <= 0) openStore();
-                                    else runProThought();
-                                    setShowSmartNudge(false);
-                                }}
-                                style={styles.busyRow}
-                                hitSlop={10}
-                            >
-
-                                    <Text style={styles.busyText2}>
-                                        {typeof remainingPro === "number" && remainingPro <= 0
-                                            ? "You’re out of Smart Thoughts. Smart Thoughts use the photo and surroundings for richer, more personal lines. Tap to get more."
-                                            : "Try Smart Thought. Smart Thought uses the scene and details around your pet for a more thoughtful, personalised response."}
-                                    </Text>
-
-                                <View style={styles.busyTailShadow} />
-                                <View style={styles.busyArrow}/>
-
-                            </Pressable>
-                        )}
-
+                        {showCaption && <ShareCaptionBar />}
                     </View>
 
-
-                    <View style={styles.controls}>
-                        <View style={styles.mainButtons}>
-                            <Pressable
-                                style={[styles.primaryBtn, disableButtons && styles.btnDisabled]}
-                                onPress={runThought}
-                                disabled={disableButtons}
-                            >
-                                <View style={styles.btnInnerRow}>
-                                    <Ionicons name="refresh" size={18} color="#1e1f27"/>
-                                    <Text style={styles.primaryBtnText}>{thinking ? "Thinking…" : "Refresh"}</Text>
-                                </View>
-                            </Pressable>
-                            <Pressable
-                                style={[styles.proBtn, disableButtons && styles.btnDisabled]}
-                                onPress={runProThought}
-                                disabled={disableButtons}
-                            >
-                                <View style={styles.btnInnerRow}>
-                                    <Ionicons name="rocket" size={18} color="#1e1f27"/>
-                                    <Text style={styles.proBtnText}>
-                                        Smart{serverOnline && typeof remainingPro === "number" ? ` (${remainingPro})` : ""}
-                                    </Text>
-                                </View>
-                            </Pressable>
-                        </View>
-
-
-                        <View style={styles.shareControls}>
-                            <TopIconButton icon="home-outline" label="Home" onPress={() => router.replace("/")}
-                                           disabled={disableButtons}/>
-                            <TopIconButton icon="camera-reverse-outline" label="Retake" onPress={() => router.back()}
-                                           disabled={disableButtons}/>
-                            <TopIconButton icon="share-social-outline" label="Share" onPress={onShare}
-                                           disabled={disableButtons}/>
-                            <TopIconButton icon="download-outline" label="Save" onPress={onDownload}
-                                           disabled={disableButtons}/>
-                        </View>
-
-
-                        {/* DEV button if you want it back */}
-                        {/* <Pressable style={[styles.primaryBtn, { marginTop: 10 }]} onPress={onDevAdd} disabled={disableButtons}>
-                            <Text style={styles.primaryBtnText}>+5 (Dev)</Text>
-                        </Pressable> */}
-                    </View>
+                    <ThoughtBottomBar
+                        disableButtons={disableButtons}
+                        backIcon={fromProfiles ? "paw-outline" : "camera-reverse-outline"}
+                        backLabel={fromProfiles ? "Profiles" : "Retake"}
+                        onHome={() => router.replace("/")}
+                        onBack={() => router.back()}
+                        onShare={onShare}
+                        onDownload={onDownload}
+                        topContent={
+                            <View style={styles.mainButtons}>
+                                <TTButton
+                                    title="Refresh"
+                                    onPress={() => runSmartThought({ auto: false })}
+                                    disabled={disableButtons}
+                                    loading={false}
+                                    style={{ flex: 1 }}
+                                    leftIcon={<Ionicons name="refresh" size={18} color={t.colors.textOverPrimary} />}
+                                />
+                            </View>
+                        }
+                    />
                 </View>
-            </SafeAreaView>
+            </Screen>
         </>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {flex: 1},
-
-    exportWrap: {flex: 1},
-    image: {width: "100%", height: "100%", resizeMode: "cover"},
-
-    bubblePos: {
-        position: "absolute",
-        top: 20,
-        left: 20,
-        right: 20,
-        alignItems: "flex-start",
-    },
-
-    // Bottom bar (icons)
-    shareControls: {
-        flexDirection: "row",
-        gap: 10,
-        padding: 10,
-        borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.08)",
-    },
-
-    topIconBtn: {
-        flex: 1,
-        height: 56,
-        borderRadius: 10,
-        backgroundColor: "rgba(255,255,255,0.08)",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 4,
-    },
-    topIconBtnPressed: {transform: [{scale: 0.99}], opacity: 0.95},
-    topIconBtnDisabled: {opacity: 0.5},
-
-    topIconLabel: {
-        color: "rgba(255,255,255,0.95)",
-        fontWeight: "600",
-        fontSize: 11,
-    },
-
-    controls: {
-        gap: 10
-    },
-
-    mainButtons: {
-        paddingTop: 10,
-        paddingHorizontal: 10,
-        flexDirection: "row",
-        gap: 10
-    },
-
-    ad: {
-        paddingVertical: 5
-    },
-
-    btnInnerRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 5,
-    },
-
-    primaryBtn: {
-        flex: 1,
-        paddingVertical: 14,
-        borderRadius: 10,
-        backgroundColor: "#f8db46",
-        alignItems: "center",
-    },
-    primaryBtnText: {
-        color: "#1e1f27",
-        fontWeight: "600"
-    },
-
-    proBtn: {
-        flex: 1,
-        paddingVertical: 14,
-        borderRadius: 10,
-        backgroundColor: "#ff7c40",
-        alignItems: "center",
-    },
-
-    proBtnText: {
-        color: "#1e1f27",
-        fontWeight: "600"
-    },
-
-    btnDisabled: {
-        opacity: 0.5
-    },
-
-    busyRow: {
-        position: "absolute",
-        left: 10,
-        right: 10,
-        bottom: 20,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#FFFFFF",
-        padding: 10,
-        borderRadius: 12,
-        shadowColor: "#000",
-        shadowOpacity: 0.30,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 6, // Android
-    },
-
-    busyText: {
-        fontSize: 16,
-        lineHeight: 22,
-        textAlign: "center",
-        color: "#2E2E2E",
-        fontWeight: "400",
-    },
-    busyText2: {
-        fontSize: 14,
-        lineHeight: 20,
-        textAlign: "center",
-        color: "#2E2E2E",
-        fontWeight: "400",
-    },
-
-    busyArrow: {
-        position: "absolute",
-        bottom: -8,
-        right: '25%',
-        width: 20,
-        height: 20,
-        marginLeft: -10,
-        backgroundColor: "#FFFFFF",
-        transform: [{ rotate: "45deg" }],
-        borderRadius: 3,
-    },
-
-    busyTailShadow: {
-        position: "absolute",
-        bottom: -12,
-        right: '25%',
-        marginLeft: -10,
-        width: 20,
-        height: 20,
-        backgroundColor: "#000",
-        transform: [{ rotate: "45deg" }],
-        opacity: 0.1,
-        borderRadius: 3,
-    },
-
-});

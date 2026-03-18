@@ -1,93 +1,62 @@
-// app/camera.js
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     View,
     Text,
     Pressable,
     StyleSheet,
     ActivityIndicator,
-    Platform,
     Animated,
     Easing,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { pingServer } from "../src/services/ai";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 
-async function setAndroidNavBarDark() {
-    if (Platform.OS !== "android") return;
-
-    try {
-        const mod = await import("expo-navigation-bar");
-        const Nav = mod?.default ?? mod;
-
-        if (!Nav?.setButtonStyleAsync) {
-            console.warn("NavigationBar loaded but setButtonStyleAsync is missing.");
-            return;
-        }
-
-        // ✅ Edge-to-edge friendly: set icon colour only
-        await Nav.setButtonStyleAsync("light"); // light icons
-    } catch (e) {
-        console.warn("NavigationBar not available:", e?.message || e);
-    }
-}
+import Screen from "../src/components/ui/Screen";
+import { useTTTheme } from "../src/theme";
+import { useGlobalStyles } from "../src/theme/globalStyles";
+import { setAndroidNavBarStyle } from "../src/utils/navBar";
+import { prewarmImageDataUrl } from "../src/services/imageDataUrl";
 
 export default function CameraScreen() {
+    const t = useTTTheme();
+    const g = useGlobalStyles(t);
+    const styles = useMemo(() => makeStyles(t), [t]);
+
     const cameraRef = useRef(null);
     const [permission, requestPermission] = useCameraPermissions();
     const [facing, setFacing] = useState("back");
     const [checking, setChecking] = useState(false);
 
-    // Pulse animation
     const pulse = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        setAndroidNavBarDark();
+        setAndroidNavBarStyle("light");
     }, []);
 
     useEffect(() => {
-        if (!permission) return;
-        if (!permission.granted) requestPermission();
-    }, [permission]);
+        if (permission && !permission.granted) requestPermission();
+    }, [permission, requestPermission]);
 
     useEffect(() => {
-        // Smooth breathing pulse
         const anim = Animated.loop(
             Animated.sequence([
-                Animated.timing(pulse, {
-                    toValue: 1,
-                    duration: 1200,
-                    easing: Easing.inOut(Easing.quad),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulse, {
-                    toValue: 0,
-                    duration: 1200,
-                    easing: Easing.inOut(Easing.quad),
-                    useNativeDriver: true,
-                }),
+                Animated.timing(pulse, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+                Animated.timing(pulse, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
             ])
         );
-
         anim.start();
         return () => anim.stop();
     }, [pulse]);
 
     if (!permission) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator />
-            </View>
-        );
+        return <View style={g.center}><ActivityIndicator /></View>;
     }
 
     if (!permission.granted) {
         return (
-            <View style={styles.center}>
+            <View style={g.center}>
                 <Pressable style={styles.btn} onPress={requestPermission}>
                     <Text style={styles.btnText}>Allow Camera</Text>
                 </Pressable>
@@ -97,242 +66,148 @@ export default function CameraScreen() {
 
     const takePhoto = async () => {
         if (!cameraRef.current || checking) return;
-
         setChecking(true);
-        let online = false;
-
         try {
-            online = await pingServer();
-        } catch {
-            online = false;
-        }
-
-        try {
-            const photo = await cameraRef.current.takePictureAsync();
-            router.push({
-                pathname: "/preview",
-                params: { uri: photo.uri, online: online ? "1" : "0" },
-            });
+            const photo = await cameraRef.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
+            // Start processing image in background during navigation transition
+            prewarmImageDataUrl(photo.uri);
+            router.push({ pathname: "/preview", params: { uri: photo.uri } });
         } finally {
             setChecking(false);
         }
     };
 
-    const guideScale = pulse.interpolate({
-        inputRange: [0, 1],
-        outputRange: [1, 1.03],
-    });
-
-    const guideOpacity = pulse.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.75, 0.95],
-    });
+    const guideScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] });
+    const guideOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.75, 0.95] });
 
     return (
         <>
-            <StatusBar style="light" />
-            <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+            <StatusBar style={t.isDark ? "light" : "dark"} />
+            <Screen style={{ backgroundColor: "#000" }}>
                 <View style={styles.container}>
                     <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={facing} />
 
                     <View style={styles.overlay}>
                         <View style={styles.topBar}>
-                            {/* Close */}
                             <Pressable
                                 onPress={() => router.back()}
                                 disabled={checking}
-                                style={({ pressed }) => [
-                                    styles.iconBtn,
-                                    pressed && !checking && styles.iconBtnPressed,
-                                    checking && styles.iconBtnDisabled,
-                                ]}
-                                hitSlop={10}
+                                style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
                             >
-                                <Ionicons name="close-outline" size={26} color="#fff" />
+                                <Ionicons name="chevron-back" size={24} color="#fff" />
                             </Pressable>
 
-                            {/* Switch camera */}
-                            <Pressable
-                                onPress={() => setFacing((p) => (p === "back" ? "front" : "back"))}
-                                disabled={checking}
-                                style={({ pressed }) => [
-                                    styles.iconBtn,
-                                    pressed && !checking && styles.iconBtnPressed,
-                                    checking && styles.iconBtnDisabled,
-                                ]}
-                                hitSlop={10}
-                            >
-                                <Ionicons name="sync-outline" size={24} color="#fff" />
-                            </Pressable>
-                        </View>
-
-                        {/* Center guide + tooltip (true centered) */}
-                        <View pointerEvents="none" style={styles.centerLayer}>
-                            <View style={styles.centerStack}>
-                                {/* Tooltip */}
-                                <View style={styles.tooltipWrap}>
-                                    <View style={styles.tooltipPill}>
-                                        <Text style={styles.tooltipText}>{checking ? "Hold still…" : "Place your pet here"}</Text>
-                                    </View>
-                                    <View style={styles.tooltipArrow} />
-                                </View>
-
-                                {/* Pulsing dashed frame */}
-                                <Animated.View
-                                    style={[
-                                        styles.centerGuide,
-                                        {
-                                            transform: [{ scale: guideScale }],
-                                            opacity: guideOpacity,
-                                        },
-                                    ]}
-                                >
-                                    <Ionicons name="paw-outline" size={42} color="rgba(255,255,255,0.7)" />
-                                </Animated.View>
+                            <View style={styles.pill}>
+                                <Ionicons name="sparkles" size={16} color="#fff" />
+                                <Text style={styles.pillText}>Find your pet</Text>
                             </View>
+
+                            <Pressable
+                                onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
+                                disabled={checking}
+                                style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.7 }]}
+                            >
+                                <Ionicons name="camera-reverse-outline" size={22} color="#fff" />
+                            </Pressable>
                         </View>
 
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[styles.guide, { opacity: guideOpacity, transform: [{ scale: guideScale }] }]}
+                        />
 
                         <View style={styles.bottomBar}>
                             <Pressable
                                 onPress={takePhoto}
                                 disabled={checking}
                                 style={({ pressed }) => [
-                                    styles.shutterOuter,
-                                    pressed && !checking && styles.shutterOuterPressed,
-                                    checking && styles.shutterOuterDisabled,
+                                    styles.captureOuter,
+                                    pressed && !checking && { transform: [{ scale: 0.98 }] },
                                 ]}
-                                hitSlop={12}
                             >
-                                <View style={styles.shutterInner}>
-                                    <Ionicons name="camera-outline" size={28} color="#000" />
+                                <View style={styles.captureInner}>
+                                    {checking ? <ActivityIndicator color="#fff" /> : null}
                                 </View>
                             </Pressable>
+                            <Text style={styles.hint}>Tap to capture. Your pet is already judging you. 🙂</Text>
                         </View>
                     </View>
                 </View>
-            </SafeAreaView>
+            </Screen>
         </>
     );
 }
 
-const GUIDE_W = 250;
-const GUIDE_H = 280;
-
-const styles = StyleSheet.create({
-    safe: { flex: 1, backgroundColor: "#000" },
-    container: { flex: 1, backgroundColor: "#000" },
-
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: "space-between",
-        paddingTop: 25,
-        paddingBottom: 40,
-        paddingHorizontal: 25,
-    },
-
-    topBar: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-    },
-
-    iconBtn: {
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.35)",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.14)",
-    },
-    iconBtnPressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
-    iconBtnDisabled: { opacity: 0.5 },
-
-    // --- Center guide positioning (true center) ---
-    centerLayer: {
-        ...StyleSheet.absoluteFillObject,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    centerStack: {
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-// Tooltip positioned relative to the guide
-    tooltipWrap: {
-        alignItems: "center",
-        marginBottom: 14, // sits above the box
-    },
-
-    tooltipPill: {
-        backgroundColor: "rgba(0,0,0,0.78)",
-        borderWidth: 1,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 14,
-    },
-
-    tooltipText: {
-        color: "rgba(255,255,255,0.95)",
-        fontWeight: "400",
-        fontSize: 13,
-    },
-
-    tooltipArrow: {
-        marginTop: -1,
-        width: 0,
-        height: 0,
-        borderLeftWidth: 8,
-        borderRightWidth: 8,
-        borderTopWidth: 10,
-        borderLeftColor: "transparent",
-        borderRightColor: "transparent",
-        borderTopColor: "rgba(0,0,0,0.78)",
-    },
-
-    centerGuide: {
-        width: 250,
-        height: 280,
-        borderRadius: 28,
-        borderWidth: 2,
-        borderStyle: "dashed",
-        borderColor: "rgba(255,255,255,0.55)",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "rgba(0,0,0,0.10)",
-        marginBottom: 80
-    },
-
-
-    bottomBar: { alignItems: "center" },
-
-    shutterOuter: {
-        width: 84,
-        height: 84,
-        borderRadius: 42,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 5,
-        borderColor: "#fff",
-        backgroundColor: "rgba(255,255,255,0.08)",
-    },
-    shutterOuterPressed: { transform: [{ scale: 0.985 }], opacity: 0.95 },
-    shutterOuterDisabled: { opacity: 0.6 },
-
-    shutterInner: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#fff",
-    },
-
-    center: { flex: 1, justifyContent: "center", alignItems: "center" },
-    btn: { padding: 14, backgroundColor: "#2563eb", borderRadius: 12 },
-    btnText: { color: "#fff", fontWeight: "800" },
-});
+const makeStyles = (t) =>
+    StyleSheet.create({
+        container: { flex: 1, backgroundColor: "#000" },
+        overlay: {
+            ...StyleSheet.absoluteFillObject,
+            padding: t.spacing.lg,
+            justifyContent: "space-between",
+        },
+        topBar: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: 2,
+        },
+        iconBtn: {
+            width: 42,
+            height: 42,
+            borderRadius: 999,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0,0,0,0.35)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.12)",
+        },
+        pill: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 999,
+            backgroundColor: "rgba(0,0,0,0.35)",
+            borderWidth: 1,
+            borderColor: "rgba(255,255,255,0.12)",
+        },
+        pillText: { color: "#fff", fontSize: 13, fontWeight: "700", letterSpacing: 0.2 },
+        guide: {
+            alignSelf: "center",
+            width: 240,
+            height: 240,
+            borderRadius: 28,
+            borderWidth: 2,
+            borderColor: "rgba(255,255,255,0.55)",
+            backgroundColor: "rgba(255,255,255,0.04)",
+        },
+        bottomBar: { alignItems: "center", gap: 12, paddingBottom: 8 },
+        captureOuter: {
+            width: 84,
+            height: 84,
+            borderRadius: 999,
+            backgroundColor: "rgba(255,255,255,0.18)",
+            borderWidth: 2,
+            borderColor: "rgba(255,255,255,0.45)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        captureInner: {
+            width: 64,
+            height: 64,
+            borderRadius: 999,
+            backgroundColor: t.colors.primary,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        hint: { color: "rgba(255,255,255,0.85)", fontSize: 13, textAlign: "center" },
+        btn: {
+            backgroundColor: t.colors.primary,
+            paddingVertical: 14,
+            paddingHorizontal: 18,
+            borderRadius: t.radius.md,
+        },
+        btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    });
