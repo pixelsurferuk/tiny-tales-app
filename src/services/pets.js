@@ -8,7 +8,7 @@ function mergeDefined(base, patch) {
     const out = { ...(base || {}) };
     Object.keys(patch || {}).forEach((k) => {
         const v = patch[k];
-        if (v !== undefined) out[k] = v; // ✅ do not overwrite with undefined
+        if (v !== undefined) out[k] = v;
     });
     return out;
 }
@@ -20,6 +20,39 @@ function safeJsonParse(str, fallback) {
 function makeId() {
     return `pet_${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
 }
+
+// ─── Age helper ───────────────────────────────────────────────────────────────
+
+export function calculateAge(birthDate) {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const now = new Date();
+
+    const years = now.getFullYear() - birth.getFullYear();
+    const months = now.getMonth() - birth.getMonth();
+    const totalMonths = years * 12 + months;
+
+    if (totalMonths < 1) return { value: 0, unit: "months", label: "Less than 1 month" };
+    if (totalMonths < 12) return { value: totalMonths, unit: "months", label: `${totalMonths} month${totalMonths !== 1 ? "s" : ""}` };
+
+    const exactYears = Math.floor(totalMonths / 12);
+    const remainingMonths = totalMonths % 12;
+
+    if (remainingMonths === 0) return { value: exactYears, unit: "years", label: `${exactYears} year${exactYears !== 1 ? "s" : ""}` };
+    return {
+        value: exactYears,
+        unit: "years",
+        label: `${exactYears} year${exactYears !== 1 ? "s" : ""} ${remainingMonths} month${remainingMonths !== 1 ? "s" : ""}`,
+    };
+}
+
+export function formatAgeForPrompt(birthDate) {
+    const age = calculateAge(birthDate);
+    if (!age) return null;
+    return age.label;
+}
+
+// ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 export async function getPets() {
     const raw = await AsyncStorage.getItem(KEY_PETS);
@@ -63,11 +96,12 @@ export async function upsertPet(pet) {
                 name: cleanName,
                 avatarUri: pet?.avatarUri || null,
                 vibe: pet?.vibe || null,
+                breed: pet?.breed || null,
+                birthDate: pet?.birthDate || null,
                 createdAt: now,
                 updatedAt: now,
             },
             {
-                // ✅ include these if caller provided them
                 petType: pet?.petType,
                 petTypeSource: pet?.petTypeSource,
                 petTypeUpdatedAt: pet?.petTypeUpdatedAt,
@@ -88,7 +122,7 @@ export async function upsertPet(pet) {
 
         const patched = mergeDefined(p, {
             ...pet,
-            name: cleanName || p.name, // avoid blanking name
+            name: cleanName || p.name,
         });
 
         return { ...patched, updatedAt: now };
@@ -113,9 +147,14 @@ export async function deletePet(id) {
 
 export function summarizePetForPrompt(pet) {
     if (!pet) return null;
+    const age = formatAgeForPrompt(pet.birthDate);
     return {
         id: pet.id,
         name: pet.name,
         vibe: pet.vibe || null,
+        memory: pet.memory || null,
+        breed: pet.breed || null,
+        age: age || null,
+        petType: pet.petType || null,
     };
 }

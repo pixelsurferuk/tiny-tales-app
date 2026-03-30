@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
-import { View, Image, StyleSheet, Text, ActivityIndicator, Alert, Platform, Share } from "react-native";
+import { View, Image, Text, ActivityIndicator, Platform, Share } from "react-native";
 import * as Sharing from "expo-sharing";
 import * as MediaLibrary from "expo-media-library";
 import { captureRef } from "react-native-view-shot";
@@ -10,10 +10,9 @@ import { Ionicons } from "@expo/vector-icons";
 import Screen from "../src/components/ui/Screen";
 import TTButton from "../src/components/ui/TTButton";
 import ShareCaptionBar from "../src/components/ui/ShareCaptionBar";
-import { useTTTheme } from "../src/theme";
+import { useTTTheme, useGlobalStyles, makePreviewStyles } from "../src/theme/globalStyles";
 import { AppBannerAd } from "../src/ads/admob";
 import SpeechBubble from "../src/components/ui/SpeechBubble";
-import ThoughtBottomBar from "../src/components/ui/ThoughtBottomBar";
 import { getThoughtFromServer } from "../src/services/ai";
 import { getAccessToken } from "../src/services/auth";
 import { makeImageDataUrlPro } from "../src/services/imageDataUrl";
@@ -23,6 +22,10 @@ import { parseCreditsFromResponse } from "../src/utils/credits";
 import { setAndroidNavBarStyle } from "../src/utils/navBar";
 import { useEntitlements } from "../src/state/entitlements";
 import { CREDIT_ERROR_CODES } from "../src/config";
+import { useTTAlert } from "../src/components/ui/TTAlert";
+import { useAdGate } from "../src/ads/useAdGate";
+import PetHeader from "../src/components/ui/PetHeader";
+import AuthCreditsBar from "../src/components/auth/AuthCreditsBar";
 
 function pickParamString(v) {
     if (typeof v === "string") return v;
@@ -30,48 +33,19 @@ function pickParamString(v) {
     return null;
 }
 
-const makeStyles = (t) =>
-    StyleSheet.create({
-        container: { flex: 1 },
-        exportWrap: { flex: 1, flexDirection: "column" },
-        imageWrap: { flex: 1 },
-        image: { width: "100%", height: "100%", resizeMode: "cover" },
-        bubblePos: { position: "absolute", top: 20, left: 20, right: 20, alignItems: "flex-start" },
-        mainButtons: { flexDirection: "row", gap: 10 },
-        busyRow: {
-            position: "absolute",
-            left: 10,
-            right: 10,
-            bottom: 20,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "#FFFFFF",
-            padding: 10,
-            borderRadius: 12,
-            shadowColor: "#000",
-            shadowOpacity: 0.3,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 6,
-        },
-        busyText: { fontSize: 16, lineHeight: 22, textAlign: "center", color: "#2E2E2E", fontWeight: "400" },
-    });
-
 export default function Preview() {
     const params = useLocalSearchParams();
     const t = useTTTheme();
-    const styles = useMemo(() => makeStyles(t), [t]);
+    const g = useGlobalStyles(t);
+    const styles = useMemo(() => makePreviewStyles(t), [t]);
 
     const { deviceId: identityId, isPro, server, refreshAll, setCreditsLocal } = useEntitlements();
 
     const uri = pickParamString(params?.uri);
     const fromProfiles = pickParamString(params?.src) === "profiles";
 
-    const [thought, setThought] = useState("…");
+    const [thought, setThought] = useState("");
     const [thinking, setThinking] = useState(false);
-    const [thinkingStage, setThinkingStage] = useState("");
-    const [checkingAccess, setCheckingAccess] = useState(true);
     const [busy, setBusy] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [showCaption, setShowCaption] = useState(false);
@@ -79,26 +53,35 @@ export default function Preview() {
     const [adRefresh, setAdRefresh] = useState(0);
     const [activePet, setActivePet] = useState(null);
 
+    const [thinkingStep, setThinkingStep] = useState(0);
+
     const [mediaPerm] = MediaLibrary.usePermissions({ writeOnly: true });
+
     const cardRef = useRef(null);
     const thinkingRef = useRef(false);
     const autoRequestedRef = useRef(false);
     const proDataUrlRef = useRef(null);
+    const justWatchedAdRef = useRef(false);
 
-    useEffect(() => { setAndroidNavBarStyle("light"); }, []);
+    const getParam = (p) => Array.isArray(p) ? p[0] : p;
+    const from = typeof getParam(params?.from) === "string" ? getParam(params.from) : null;
+
+    const alert = useTTAlert();
+
+    useEffect(() => {
+        setAndroidNavBarStyle("light");
+    }, []);
 
     useEffect(() => {
         proDataUrlRef.current = null;
         autoRequestedRef.current = false;
-        setCheckingAccess(true);
         setImageLoaded(false);
     }, [uri]);
 
     const refreshActivePet = useCallback(async () => {
         try {
             setActivePet(await getActivePet() || null);
-        } catch (e) {
-            console.warn("[preview] getActivePet failed", e?.message || e);
+        } catch {
             setActivePet(null);
         }
     }, []);
@@ -110,266 +93,260 @@ export default function Preview() {
         }, [refreshActivePet, refreshAll])
     );
 
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            if (!uri || !identityId) {
-                if (!cancelled) setCheckingAccess(false);
+    const openPaywall = useCallback(() => {
+        router.replace({
+            pathname: "/paywall",
+            params: {
+                source: "thoughts",
+                from, // 👈 THIS is what was missing
+            },
+        });
+    }, [from]);
+
+    const runSmartThought = useCallback(async ({ auto = false } = {}) => {
+        if (!uri || !identityId) return;
+        if (thinkingRef.current) return;
+
+        thinkingRef.current = true;
+        setThinking(true);
+
+        try {
+            let remaining = server?.creditsRemaining ?? null;
+
+            if (!isPro && (remaining === null || remaining <= 0)) {
+                const result = await refreshAll({ reason: "precheck", retries: 1, delayMs: 200 });
+                remaining = result?.status?.creditsRemaining ?? 0;
+
+                if (remaining <= 0) {
+                    if (!justWatchedAdRef.current) {
+                        tryWatchAd();
+                    }
+                    return;
+                }
+            }
+
+            if (!proDataUrlRef.current) {
+                const [dataUrl] = await Promise.all([
+                    makeImageDataUrlPro(uri),
+                    getAccessToken().catch(() => null),
+                ]);
+                proDataUrlRef.current = dataUrl;
+            }
+
+            const r = await getThoughtFromServer({
+                imageDataUrl: proDataUrlRef.current,
+                identityId,
+                pet: summarizePetForPrompt(activePet),
+            });
+
+            if (!r?.ok) {
+                if (CREDIT_ERROR_CODES.has(r?.error)) {
+                    tryWatchAd();
+                    return;
+                }
+                alert("Thought Error", "Couldn't generate a thought.");
                 return;
             }
-            try {
-                setCheckingAccess(true);
-                const result = await refreshAll({ reason: "preview_access_check", retries: 1, delayMs: 200 });
-                const remaining = result?.status?.creditsRemaining ?? server?.creditsRemaining ?? null;
-                if (!cancelled && !isPro && remaining !== null && remaining <= 0) {
-                    router.replace({ pathname: "/paywall", params: { source: "thoughts" } });
-                }
-            } catch (e) {
-                console.warn("[preview] access check failed", e?.message || e);
-            } finally {
-                if (!cancelled) setCheckingAccess(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [uri, identityId, isPro, refreshAll]);
 
-    const redirectToPaywall = useCallback((creditPatch) => {
-        if (creditPatch) {
-            const parsed = parseCreditsFromResponse(creditPatch);
-            if (Object.values(parsed).some((v) => typeof v === "number")) {
-                setCreditsLocal(parsed);
+            setThought(r?.thought || pickOfflineThought());
+
+            const patch = parseCreditsFromResponse(r);
+            if (Object.values(patch).some((v) => typeof v === "number")) {
+                setCreditsLocal(patch);
             }
+
+            setAdRefresh((n) => n + 1);
+            setServerOnline(true);
+
+        } catch (e) {
+            setServerOnline(false);
+            setThought(pickOfflineThought());
+        } finally {
+            thinkingRef.current = false;
+            setThinking(false);
         }
-        router.replace({ pathname: "/paywall", params: { source: "thoughts" } });
-    }, [setCreditsLocal]);
+    }, [uri, identityId, activePet, isPro, server?.creditsRemaining, refreshAll, setCreditsLocal]);
 
-    const runSmartThought = useCallback(
-        async ({ auto = false } = {}) => {
-            if (!uri) return;
-            if (!identityId) {
-                if (!auto) Alert.alert("Missing identity", "Try again in a second.");
-                return;
-            }
-            if (thinkingRef.current || checkingAccess) return;
+    const { tryWatchAd, isWatchingAd } = useAdGate({
+        onCreditsGranted: async () => {
+            justWatchedAdRef.current = true;
 
-            try {
-                if (!isPro) {
-                    setCheckingAccess(true);
-                    let remaining = server?.creditsRemaining ?? null;
-                    if (remaining === null) {
-                        const result = await refreshAll({ reason: "preview_precheck", retries: 1, delayMs: 250 });
-                        remaining = result?.status?.creditsRemaining ?? server?.creditsRemaining ?? null;
-                    }
-                    if (remaining !== null && remaining <= 0) {
-                        redirectToPaywall(null);
-                        return;
-                    }
-                }
-            } finally {
-                setCheckingAccess(false);
-            }
+            await refreshAll({ reason: "post_ad_reward", retries: 1, delayMs: 200 });
 
-            thinkingRef.current = true;
-            setThinking(true);
+            autoRequestedRef.current = false;
 
-            try {
-                setThinkingStage("Preparing…");
-                // Parallelise image processing and auth token fetch
-                if (!proDataUrlRef.current) {
-                    const [dataUrl] = await Promise.all([
-                        makeImageDataUrlPro(uri),
-                        getAccessToken().catch(() => null),
-                    ]);
-                    proDataUrlRef.current = dataUrl;
-                }
-
-                setThinkingStage("Thinking…");
-                const r = await getThoughtFromServer({
-                    imageDataUrl: proDataUrlRef.current,
-                    identityId,
-                    pet: summarizePetForPrompt(activePet),
-                });
-
-                setServerOnline(true);
-
-                if (!r?.ok) {
-                    if (CREDIT_ERROR_CODES.has(r?.error)) {
-                        redirectToPaywall(r);
-                        return;
-                    }
-                    if(__DEV__) Alert.alert("Thought Error", "Couldn't generate a thought.");
-                    return;
-                }
-
-                setThinkingStage("Crafting response…");
-                setThought(r?.thought || pickOfflineThought());
-
-                const patch = parseCreditsFromResponse(r);
-                if (Object.values(patch).some((v) => typeof v === "number")) {
-                    setCreditsLocal(patch);
-                } else if (!isPro) {
-                    await refreshAll({ reason: "smart_thought_spend", retries: 1, delayMs: 250 });
-                }
-
-                setAdRefresh((n) => n + 1);
-            } catch (e) {
-                console.warn("[preview] smart thought error", e?.message, e?.status, e?.data || e);
-                const errCode = e?.data?.error;
-                if (CREDIT_ERROR_CODES.has(errCode)) {
-                    redirectToPaywall(e?.data);
-                    return;
-                }
-                setServerOnline(false);
-                setThought(pickOfflineThought());
-            } finally {
-                thinkingRef.current = false;
-                setThinking(false);
-                setThinkingStage("");
-            }
+            setTimeout(() => {
+                runSmartThought({ auto: true });
+                justWatchedAdRef.current = false;
+            }, 300);
         },
-        [uri, identityId, activePet, isPro, server?.creditsRemaining, refreshAll,
-            setCreditsLocal, redirectToPaywall, checkingAccess]
-    );
+        onLimitReached: openPaywall,
+    });
 
     useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            if (!uri || !identityId || checkingAccess || autoRequestedRef.current) return;
-            autoRequestedRef.current = true;
-            if (!cancelled) await runSmartThought({ auto: true });
-        })();
-        return () => { cancelled = true; };
-    }, [uri, identityId, checkingAccess, runSmartThought]);
+        if (!uri || !identityId || autoRequestedRef.current) return;
+        autoRequestedRef.current = true;
+        runSmartThought({ auto: true });
+    }, [uri, identityId, runSmartThought]);
+
+    useEffect(() => {
+        if (!thinking) {
+            setThinkingStep(0);
+            return;
+        }
+        const id = setInterval(() => {
+            setThinkingStep((prev) => (prev + 1) % 4);
+        }, 350);
+        return () => clearInterval(id);
+    }, [thinking]);
 
     async function exportComposite() {
         try {
             setBusy(true);
-            if (!cardRef.current) {
-                Alert.alert("Export failed", "Preview view not ready yet.");
-                return null;
-            }
-            if (!imageLoaded) {
-                Alert.alert("Export failed", "Image is still loading, try again in a moment.");
-                return null;
-            }
+            if (!cardRef.current || !imageLoaded) return null;
+
             setShowCaption(true);
-            await new Promise((resolve) => setTimeout(resolve, 150));
-            const result = await captureRef(cardRef.current, { format: "png", quality: 1, result: "tmpfile" });
+            await new Promise((r) => setTimeout(r, 150));
+
+            const result = await captureRef(cardRef.current, {
+                format: "png",
+                quality: 1,
+                result: "tmpfile",
+            });
+
             setShowCaption(false);
             return result;
-        } catch (e) {
-            console.warn(e);
-            setShowCaption(false);
-            Alert.alert("Export failed", "Couldn't generate the image. Try again.");
-            return null;
         } finally {
             setBusy(false);
         }
     }
 
     async function onShare() {
-        const exportedUri = await exportComposite();
-        if (!exportedUri) return;
-        try {
-            if (Platform.OS === "ios") {
-                await Share.share({ url: exportedUri });
-            } else {
-                await Sharing.shareAsync(exportedUri, { mimeType: "image/png", dialogTitle: "Share Tiny Tales" });
-            }
-        } catch (e) {
-            console.warn("Share error:", e);
-            Alert.alert("Share failed", "Could not open share options.");
+        const uri = await exportComposite();
+        if (!uri) return;
+
+        if (Platform.OS === "ios") {
+            await Share.share({ url: uri });
+        } else {
+            await Sharing.shareAsync(uri);
         }
     }
 
     async function onDownload() {
-        const exportedUri = await exportComposite();
-        if (!exportedUri) return;
-        try {
-            setBusy(true);
-            if (!mediaPerm?.granted) {
-                const res = await MediaLibrary.requestPermissionsAsync(true);
-                if (!res.granted) {
-                    Alert.alert("Permission needed", "Allow Photos permission to save images.");
-                    return;
-                }
-            }
-            await MediaLibrary.saveToLibraryAsync(exportedUri);
-            Alert.alert("Saved", "Saved to your gallery.");
-        } catch (e) {
-            console.warn(e);
-            Alert.alert("Save failed", "Couldn't save to gallery.");
-        } finally {
-            setBusy(false);
+        const uri = await exportComposite();
+        if (!uri) return;
+
+        if (!mediaPerm?.granted) {
+            const res = await MediaLibrary.requestPermissionsAsync(true);
+            if (!res.granted) return;
         }
+
+        await MediaLibrary.saveToLibraryAsync(uri);
     }
 
-    const disableButtons = busy || thinking || checkingAccess;
+    const disableButtons = busy || thinking || isWatchingAd;
 
     return (
         <>
             <StatusBar style={t.isDark ? "light" : "dark"} />
             <Screen style={{ backgroundColor: t.colors.bg }} edges={["top", "bottom"]}>
                 <View style={styles.container}>
+
                     <AppBannerAd enabled={!isPro} refreshKey={`${uri}-${adRefresh}`} />
+
+                    <PetHeader
+                        petName={fromProfiles ? activePet?.name : null}
+                        avatarUri={uri}
+                        onBack={() => router.back()}
+                        onShare={onShare}
+                        onDownload={onDownload}
+                        onAddProfile={
+                            !fromProfiles
+                                ? () =>
+                                    router.push({
+                                        pathname: "/profiles/edit",
+                                        params: { avatarUri: uri },
+                                    })
+                                : undefined
+                        }
+                        disabled={disableButtons}
+                    />
+
+                    <AuthCreditsBar compact />
 
                     <View ref={cardRef} collapsable={false} style={styles.exportWrap}>
                         <View style={styles.imageWrap}>
-                            {uri ? (
-                                <Image
-                                    source={{ uri }}
-                                    style={styles.image}
-                                    onLoad={() => setImageLoaded(true)}
-                                />
-                            ) : (
-                                <View style={[styles.image, { backgroundColor: "#111" }]} />
-                            )}
+                            <Image
+                                source={{ uri }}
+                                style={[g.coverImage, !imageLoaded && { backgroundColor: "#111" }]}
+                                onLoad={() => setImageLoaded(true)}
+                            />
 
                             <View style={styles.bubblePos}>
-                                <SpeechBubble text={thought || "…"} />
+                                <SpeechBubble
+                                    text={thinking ? null : thought || ""}
+                                    customContent={
+                                        thinking ? (
+                                            <View style={{ flexDirection: "row", gap: 6, alignItems: "center", justifyContent: "center" }}>
+                                                <View style={{ flexDirection: "row", gap: 4 }}>
+                                                    {[0, 1, 2].map((i) => (
+                                                        <Ionicons
+                                                            key={i}
+                                                            name="paw"
+                                                            size={14}
+                                                            color={i < thinkingStep ? "#4cb6ac" : "rgba(0,0,0,0.15)"}
+                                                        />
+                                                    ))}
+                                                </View>
+                                            </View>
+                                        ) : null
+                                    }
+                                />
                             </View>
 
-                            {checkingAccess ? (
+                            {(thinking || isWatchingAd) && (
                                 <View style={styles.busyRow}>
                                     <ActivityIndicator style={{ marginRight: 8 }} />
-                                    <Text style={styles.busyText}>Checking credits…</Text>
+                                    <Text style={styles.busyText}>
+                                        {isWatchingAd ? "Loading ad…" : "Thinking…"}
+                                    </Text>
                                 </View>
-                            ) : thinking ? (
-                                <View style={styles.busyRow}>
-                                    <ActivityIndicator style={{ marginRight: 8 }} />
-                                    <Text style={styles.busyText}>{thinkingStage || "Thinking..."}</Text>
-                                </View>
-                            ) : !serverOnline ? (
-                                <View style={styles.busyRow}>
-                                    <Text style={styles.busyText}>Offline</Text>
-                                </View>
-                            ) : null}
+                            )}
                         </View>
 
                         {showCaption && <ShareCaptionBar />}
                     </View>
 
-                    <ThoughtBottomBar
-                        disableButtons={disableButtons}
-                        backIcon={fromProfiles ? "paw-outline" : "camera-reverse-outline"}
-                        backLabel={fromProfiles ? "Profiles" : "Retake"}
-                        onHome={() => router.replace("/")}
-                        onBack={() => router.back()}
-                        onShare={onShare}
-                        onDownload={onDownload}
-                        topContent={
-                            <View style={styles.mainButtons}>
-                                <TTButton
-                                    title="Refresh"
-                                    onPress={() => runSmartThought({ auto: false })}
-                                    disabled={disableButtons}
-                                    loading={false}
-                                    style={{ flex: 1 }}
-                                    leftIcon={<Ionicons name="refresh" size={18} color={t.colors.textOverPrimary} />}
-                                />
-                            </View>
-                        }
-                    />
+                    <View style={{ flexDirection: "row", gap: 10, padding: 12 }}>
+                        <TTButton
+                            title="Refresh"
+                            onPress={() => runSmartThought({ auto: false })}
+                            disabled={disableButtons}
+                            style={{ flex: 1 }}
+                            leftIcon={<Ionicons name="refresh" size={18} color={t.colors.textOverPrimary} />}
+                        />
+
+                        <TTButton
+                            title="Share"
+                            variant="secondary"
+                            onPress={onShare}
+                            disabled={disableButtons}
+                            style={{ flex: 1 }}
+                            leftIcon={<Ionicons name="share-social-outline" size={18} color={t.colors.textOverPrimary} />}
+                        />
+
+                        {!fromProfiles && (
+                            <TTButton
+                                title="Retake"
+                                variant="third"
+                                onPress={() => router.back()}
+                                disabled={disableButtons}
+                                style={{ flex: 1 }}
+                                leftIcon={<Ionicons name="camera-outline" size={18} color={t.colors.textOverPrimary} />}
+                            />
+                        )}
+                    </View>
+
                 </View>
             </Screen>
         </>

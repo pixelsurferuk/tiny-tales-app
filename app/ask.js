@@ -1,19 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    View,
-    Image,
-    StyleSheet,
-    Text,
-    Alert,
-    Platform,
-    Share,
-    TextInput,
-    ScrollView,
-    KeyboardAvoidingView,
-    Keyboard,
-    Pressable,
+    View, Image, Text, Platform, Share,
+    TextInput, ScrollView, Keyboard, Pressable, ActivityIndicator,
 } from "react-native";
-import { StatusBar } from "expo-status-bar";
+
 import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -22,38 +12,84 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Screen from "../src/components/ui/Screen";
-import TTButton from "../src/components/ui/TTButton";
 import ShareCaptionBar from "../src/components/ui/ShareCaptionBar";
-import { useTTTheme } from "../src/theme";
+import { useTTTheme, useGlobalStyles, makeAskStyles } from "../src/theme/globalStyles";
 import { AppBannerAd } from "../src/ads/admob";
-import ThoughtBottomBar from "../src/components/ui/ThoughtBottomBar";
 import { askPetQuestionFromServer } from "../src/services/ai";
 import { makeImageDataUrlFree } from "../src/services/imageDataUrl";
-
-// Module-level cache — persists across mounts so re-opening chat
-// with the same pet doesn't re-process the image
-const _askImageCache = new Map();
-import { getActivePet, summarizePetForPrompt, setActivePetId } from "../src/services/pets";
+import { getActivePet, summarizePetForPrompt, setActivePetId, upsertPet } from "../src/services/pets";
 import { pickOfflineThought } from "../src/utils/OfflineThoughts";
 import { parseCreditsFromResponse } from "../src/utils/credits";
 import { setAndroidNavBarStyle } from "../src/utils/navBar";
 import { hexToRgba } from "../src/utils/color";
 import { useEntitlements } from "../src/state/entitlements";
 import { CHAT_STORAGE_LIMIT, CREDIT_ERROR_CODES } from "../src/config";
+import { useTTAlert } from "../src/components/ui/TTAlert";
+import { useAdGate } from "../src/ads/useAdGate";
+import PetHeader from "../src/components/ui/PetHeader";
+import AuthCreditsBar from "../src/components/auth/AuthCreditsBar";
 
+const _askImageCache = new Map();
 const getChatKey = (petId) => `tiny_tales_chat_${petId || "unknown"}`;
+
+// ─── Memory extraction helper ─────────────────────────────────────────────────
+
+const MEMORY_MAX_CHARS = 500;
+
+function extractMemory(text) {
+    const patterns = [
+        /my name is (.+)/i,
+        /i(?:'m| am) called (.+)/i,
+        /call me (.+)/i,
+        /remember (?:that )?my name is (.+)/i,
+        /remember (?:that )?i(?:'m| am) called (.+)/i,
+        /please remember (?:that )?(.+)/i,
+        /remember (?:that )?(.+)/i,
+        /don't forget (?:that )?(.+)/i,
+        /make sure you remember (?:that )?(.+)/i,
+        /keep in mind (?:that )?(.+)/i,
+        /note that (.+)/i,
+        /just so you know[,]? (.+)/i,
+        /fyi[,]? (.+)/i,
+        /i want you to know (?:that )?(.+)/i,
+        /you should know (?:that )?(.+)/i,
+        /i(?:'m| am) (.+)/i,
+        /i live in (.+)/i,
+        /i work (?:as |in )?(.+)/i,
+        /i have (?:a |an )?(.+)/i,
+        /i love (.+)/i,
+        /i hate (.+)/i,
+        /my favourite (?:\w+ )?is (.+)/i,
+        /my birthday is (.+)/i,
+        /i(?:'m| am) (\d+ years old)/i,
+    ];
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match?.[1]) return match[1].trim().replace(/[.!?]+$/, "");
+    }
+    return null;
+}
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-const TypingText = ({ styles }) => {
-    const [dots, setDots] = useState(".");
+const TypingPaws = ({ styles }) => {
+    const [step, setStep] = useState(0);
     useEffect(() => {
-        const id = setInterval(() => {
-            setDots((prev) => (prev.length >= 3 ? "." : prev + "."));
-        }, 350);
+        const id = setInterval(() => setStep((prev) => (prev + 1) % 4), 350);
         return () => clearInterval(id);
     }, []);
-    return <Text style={styles.msgTextPet}>{dots}</Text>;
+    return (
+        <View style={{ flexDirection: "row", gap: 4, alignItems: "center", paddingVertical: 2 }}>
+            {[0, 1, 2].map((i) => (
+                <Ionicons
+                    key={i}
+                    name="paw"
+                    size={14}
+                    color={i < step ? "#fff" : "rgba(255,255,255,0.25)"}
+                />
+            ))}
+        </View>
+    );
 };
 
 const ChatBubble = React.memo(({ role, text, styles }) => {
@@ -63,7 +99,7 @@ const ChatBubble = React.memo(({ role, text, styles }) => {
         <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowPet]}>
             <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubblePet]}>
                 {isTyping ? (
-                    <TypingText styles={styles} />
+                    <TypingPaws styles={styles} />
                 ) : (
                     <Text style={isUser ? styles.msgTextUser : styles.msgTextPet}>{text}</Text>
                 )}
@@ -78,7 +114,7 @@ const ChatBubble = React.memo(({ role, text, styles }) => {
 
 // ─── Chat hook ───────────────────────────────────────────────────────────────
 
-function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsume, onSetCredits } = {}) {
+function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsume, onSetCredits, onAlert } = {}) {
     const [messages, setMessages] = useState([]);
     const [isTyping, setIsTyping] = useState(false);
     const [serverOnline, setServerOnline] = useState(true);
@@ -119,14 +155,8 @@ function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsu
             const q = String(questionText || "").trim();
             if (!q || isTyping) return;
 
-            if (!displayUri) {
-                Alert.alert("No photo", "Pick a pet with a profile photo first.");
-                return;
-            }
-            if (!deviceId) {
-                Alert.alert("Sorry, we are still setting up this device.", "Try again in a second.");
-                return;
-            }
+            if (!displayUri) { onAlert?.("No photo", "Pick a pet with a profile photo first."); return; }
+            if (!deviceId) { onAlert?.("Sorry, we are still setting up this device.", "Try again in a second."); return; }
 
             const userMsg = { role: "user", text: q, ts: Date.now() };
             setMessages((prev) => [
@@ -135,6 +165,21 @@ function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsu
                 { role: "typing", ts: Date.now() + 1 },
             ]);
             setIsTyping(true);
+
+            const newMemory = extractMemory(q);
+            if (newMemory && activePet?.id) {
+                try {
+                    const existing = String(activePet.memory || "").trim();
+                    const combined = existing ? `${existing}. ${newMemory}` : newMemory;
+                    const updated = combined.length > MEMORY_MAX_CHARS
+                        ? combined.slice(combined.length - MEMORY_MAX_CHARS)
+                        : combined;
+                    await upsertPet({ ...activePet, memory: updated });
+                    activePet.memory = updated;
+                } catch (e) {
+                    if (__DEV__) console.warn("[memory] save failed", e?.message);
+                }
+            }
 
             try {
                 if (!_askImageCache.has(displayUri)) {
@@ -179,15 +224,7 @@ function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsu
                     setMessages((prev) => prev.filter((m) => m.role !== "typing"));
                     return;
                 }
-
-                console.warn("Chat Error:", {
-                    message: e?.message,
-                    code: e?.code,
-                    status: e?.status,
-                    data: e?.data,
-                    body: typeof e?.body === "string" ? e.body.slice(0, 300) : e?.body,
-                });
-
+                console.warn("Chat Error:", { message: e?.message, code: e?.code, status: e?.status, data: e?.data });
                 setServerOnline(false);
                 setMessages((prev) => [
                     ...prev.filter((m) => m.role !== "typing"),
@@ -197,7 +234,7 @@ function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsu
                 setIsTyping(false);
             }
         },
-        [activePet, displayUri, deviceId, isPro, isTyping, onConsume, onPaywall, onSetCredits]
+        [activePet, displayUri, deviceId, isPro, isTyping, onConsume, onPaywall, onSetCredits, onAlert]
     );
 
     return { messages, isTyping, sendMessage, serverOnline };
@@ -205,93 +242,11 @@ function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsu
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-const makeStyles = (t) =>
-    StyleSheet.create({
-        container: { flex: 1, backgroundColor: t.colors.bg },
-        contentContainer: { flex: 1 },
-        cardWrap: { flex: 1, flexDirection: "column" },
-        imageWrap: { flex: 1 },
-        image: { width: "100%", height: "100%", resizeMode: "cover" },
-        dismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
-        offlineRow: {
-            position: "absolute",
-            top: 12,
-            alignSelf: "center",
-            backgroundColor: "rgba(255,255,255,0.9)",
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            borderRadius: 20,
-            zIndex: 10,
-            elevation: 6,
-        },
-        offlineText: { fontSize: 12, fontWeight: "700", color: "#333" },
-        chatOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 },
-        chatPanel: { flex: 1, backgroundColor: "rgba(10,12,18,0.4)" },
-        chatContentBase: {
-            flexGrow: 1,
-            justifyContent: "flex-end",
-            gap: 10,
-            paddingHorizontal: 20,
-            paddingBottom: 15,
-        },
-        msgRow: { width: "100%", flexDirection: "row" },
-        msgRowUser: { justifyContent: "flex-end" },
-        msgRowPet: { justifyContent: "flex-start" },
-        bubble: { position: "relative", maxWidth: "85%", minWidth: 40, padding: 12, borderRadius: 16 },
-        bubbleUser: { backgroundColor: t.colors.primary, borderTopRightRadius: 2 },
-        bubblePet: { backgroundColor: t.colors.secondary, borderTopLeftRadius: 2 },
-        msgTextUser: { color: t.colors.textOverPrimary, fontWeight: "500", fontSize: 15, lineHeight: 20 },
-        msgTextPet: { color: t.colors.textOverSecondary, fontWeight: "500", fontSize: 15, lineHeight: 20 },
-        tailBase: {
-            position: "absolute",
-            top: 0,
-            width: 0,
-            height: 0,
-            borderLeftWidth: 8,
-            borderRightWidth: 8,
-            borderTopWidth: 12,
-            borderLeftColor: "transparent",
-            borderRightColor: "transparent",
-        },
-        tailUser: { right: -6, borderTopColor: t.colors.primary },
-        tailPet: { left: -6, borderTopColor: t.colors.secondary },
-        inputRow: {
-            flexDirection: "row",
-            gap: 10,
-            alignItems: "center",
-            padding: 12,
-            backgroundColor: t.colors.bg,
-            borderTopWidth: 1,
-            borderTopColor: t.colors.border,
-        },
-        inputWrap: {
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: t.isDark ? "rgba(255,255,255,0.08)" : "rgba(11,16,32,0.04)",
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: t.colors.border,
-            paddingHorizontal: 12,
-            height: 50,
-            gap: 8,
-        },
-        input: { flex: 1, color: t.colors.text, fontSize: 16 },
-        sendBtn: {
-            width: 50,
-            height: 50,
-            borderRadius: 12,
-            backgroundColor: t.colors.primary,
-            alignItems: "center",
-            justifyContent: "center",
-            elevation: 4,
-        },
-    });
-
 export default function Ask() {
     const params = useLocalSearchParams();
     const t = useTTTheme();
-    const styles = useMemo(() => makeStyles(t), [t]);
+    const g = useGlobalStyles(t);
+    const styles = useMemo(() => makeAskStyles(t), [t]);
     const scrollRef = useRef(null);
     const cardRef = useRef(null);
 
@@ -301,11 +256,25 @@ export default function Ask() {
     const [inputText, setInputText] = useState("");
     const [isExporting, setIsExporting] = useState(false);
     const [showCaption, setShowCaption] = useState(false);
-    const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+    // ─── Height restore on keyboard hide ─────────────────────────────────────
+    const [setContainerHeight] = useState(null);
+    const originalHeightRef = useRef(null);
+
+    useEffect(() => {
+        const hide = Keyboard.addListener("keyboardDidHide", () => {
+            if (originalHeightRef.current) {
+                setContainerHeight(originalHeightRef.current);
+            }
+        });
+        const show = Keyboard.addListener("keyboardDidShow", () => {
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        });
+        return () => { hide.remove(); show.remove(); };
+    }, []);
 
     const uriParam = typeof params?.uri === "string" ? params.uri : null;
     const petIdParam = typeof params?.petId === "string" ? params.petId : null;
-    const fromProfiles = params?.src === "profiles";
 
     const displayUri = useMemo(() => uriParam || activePet?.avatarUri || null, [uriParam, activePet]);
     const [mediaPerm] = MediaLibrary.usePermissions({ writeOnly: true });
@@ -315,15 +284,36 @@ export default function Ask() {
     }, []);
 
     const remaining = typeof server?.creditsRemaining === "number" ? server.creditsRemaining : 0;
-    const canChat = isPro || remaining > 0;
     const isOutOfFree = !isPro && remaining <= 0;
+
+    const alert = useTTAlert();
+
+    const pendingQuestionRef = useRef(null);
+
+    const { tryWatchAd, isWatchingAd } = useAdGate({
+        onCreditsGranted: () => {
+            if (pendingQuestionRef.current) {
+                const q = pendingQuestionRef.current;
+                pendingQuestionRef.current = null;
+                setTimeout(() => sendMessage(q), 300);
+            }
+        },
+        onLimitReached: openPaywall,
+    });
 
     const { messages, isTyping, sendMessage, serverOnline } = usePetChat(activePet, displayUri, {
         deviceId,
         isPro,
-        onPaywall: openPaywall,
+        onPaywall: () => {
+            if (pendingQuestionRef.current) {
+                tryWatchAd();
+            } else {
+                openPaywall();
+            }
+        },
         onConsume: consumeCreditLocally,
         onSetCredits: setCreditsLocal,
+        onAlert: alert,
     });
 
     useEffect(() => { setAndroidNavBarStyle("light"); }, []);
@@ -337,32 +327,32 @@ export default function Ask() {
                     const pet = await getActivePet();
                     if (!alive) return;
                     setActivePet(pet);
-                    // Delay gives any in-flight paywall purchase refresh time to
-                    // complete and release the refreshing lock before we run
                     await new Promise((resolve) => setTimeout(resolve, 400));
                     if (!alive) return;
                     await refreshAll({ reason: "ask_focus", retries: 1, delayMs: 300 });
-                } catch {
-                    // ignore
-                }
+                } catch { /* ignore */ }
             })();
             return () => { alive = false; };
         }, [petIdParam, refreshAll])
     );
 
+    // Only scroll to end when new messages arrive
+    const prevMessageCountRef = useRef(0);
     useEffect(() => {
-        const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-        return () => clearTimeout(id);
-    }, [messages, keyboardVisible]);
-
-    useEffect(() => {
-        const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
-        const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
-        return () => { show.remove(); hide.remove(); };
-    }, []);
+        if (messages.length > prevMessageCountRef.current) {
+            prevMessageCountRef.current = messages.length;
+            const id = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+            return () => clearTimeout(id);
+        }
+    }, [messages]);
 
     const handleSend = () => {
-        if (!canChat) { openPaywall(); return; }
+        if (isOutOfFree) {
+            pendingQuestionRef.current = inputText.trim();
+            setInputText("");
+            tryWatchAd();
+            return;
+        }
         sendMessage(inputText);
         setInputText("");
     };
@@ -378,7 +368,7 @@ export default function Ask() {
             return result;
         } catch {
             setShowCaption(false);
-            Alert.alert("Export Error", "Could not generate image.");
+            alert("Export Error", "Could not generate image.");
             return null;
         } finally {
             setIsExporting(false);
@@ -402,31 +392,51 @@ export default function Ask() {
         if (!uri) return;
         if (!mediaPerm?.granted) {
             const { granted } = await MediaLibrary.requestPermissionsAsync();
-            if (!granted) return Alert.alert("Permission needed", "Please allow photo access.");
+            if (!granted) return alert("Permission needed", "Please allow photo access.");
         }
         await MediaLibrary.saveToLibraryAsync(uri);
-        if(__DEV__) Alert.alert("Saved", "Image saved to gallery.");
+        alert("Saved", "Image saved to gallery.");
     };
 
-    const disableChat = isTyping || isExporting || !canChat;
+    const disableChat = isTyping || isExporting || isWatchingAd;
+
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+    useEffect(() => {
+        const show = Keyboard.addListener("keyboardDidShow", (e) => {
+            setKeyboardHeight(e.endCoordinates.height);
+            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+        });
+        const hide = Keyboard.addListener("keyboardDidHide", () => {
+            setKeyboardHeight(0);
+        });
+        return () => { show.remove(); hide.remove(); };
+    }, []);
 
     return (
         <>
-            <StatusBar style={t.isDark ? "light" : "dark"} />
             <Screen style={styles.container} edges={["top", "bottom"]}>
-                <KeyboardAvoidingView
-                    style={{ flex: 1 }}
-                    behavior={Platform.OS === "ios" ? "padding" : "height"}
-                    keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-                >
-                    <View style={styles.contentContainer}>
+                <View style={[styles.contentContainer, { paddingBottom: keyboardHeight }]}>
+
                         <AppBannerAd enabled={!isPro} refreshKey={`ask-${displayUri}`} />
+
+                        <PetHeader
+                            petName={activePet?.name}
+                            avatarUri={displayUri}
+                            onBack={() => router.back()}
+                            onShare={handleShare}
+                            onDownload={handleDownload}
+                            disabled={isExporting}
+                        />
+
+                        <AuthCreditsBar compact />
 
                         <View ref={cardRef} collapsable={false} style={styles.cardWrap}>
                             <View style={styles.imageWrap}>
                                 <Image
-                                    source={displayUri ? { uri: displayUri } : null}
-                                    style={[styles.image, !displayUri && { backgroundColor: "#111" }]}
+                                    //source={displayUri ? { uri: displayUri } : null}
+                                    source={require("../assets/images/ask-bg.webp")}
+                                    style={[g.coverImage, !displayUri && { backgroundColor: "#111" }]}
                                 />
 
                                 <Pressable style={styles.dismissLayer} onPress={Keyboard.dismiss} />
@@ -441,8 +451,8 @@ export default function Ask() {
                                     <View style={styles.chatPanel}>
                                         <ScrollView
                                             ref={scrollRef}
-                                            style={{ flex: 1 }}
-                                            contentContainerStyle={styles.chatContentBase}
+                                            style={g.flex}
+                                            contentContainerStyle={styles.chatContent}
                                             keyboardShouldPersistTaps="handled"
                                             showsVerticalScrollIndicator={false}
                                         >
@@ -458,14 +468,11 @@ export default function Ask() {
                         </View>
 
                         <View style={styles.inputRow}>
-                            {isOutOfFree ? (
-                                <TTButton
-                                    variant="success"
-                                    style={{ flex: 1 }}
-                                    leftIcon={<Ionicons name="chatbubbles" size={18} color={t.colors.textOverSecondary} />}
-                                    onPress={openPaywall}
-                                    title="Unlock More Messages"
-                                />
+                            {isWatchingAd ? (
+                                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 8 }}>
+                                    <ActivityIndicator color={t.colors.primary} />
+                                    <Text style={[g.text, { opacity: 0.7 }]}>Loading ad…</Text>
+                                </View>
                             ) : (
                                 <>
                                     <View style={[styles.inputWrap, disableChat && { opacity: 0.6 }]}>
@@ -483,6 +490,8 @@ export default function Ask() {
                                             editable={!disableChat}
                                             returnKeyType="send"
                                             onSubmitEditing={handleSend}
+                                            maxLength={500}
+                                            blurOnSubmit={false}
                                         />
                                     </View>
 
@@ -499,19 +508,9 @@ export default function Ask() {
                                     </Pressable>
                                 </>
                             )}
+
                         </View>
                     </View>
-                </KeyboardAvoidingView>
-
-                <ThoughtBottomBar
-                    disableButtons={isExporting}
-                    backIcon={fromProfiles ? "paw-outline" : "arrow-back-outline"}
-                    backLabel={fromProfiles ? "Profiles" : "Back"}
-                    onHome={() => router.replace("/")}
-                    onBack={() => router.back()}
-                    onShare={handleShare}
-                    onDownload={handleDownload}
-                />
             </Screen>
         </>
     );

@@ -1,28 +1,22 @@
 // app/profiles/edit.js
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    View,
-    Text,
-    StyleSheet,
-    Pressable,
-    TextInput,
-    Image,
-    Alert,
-    ScrollView,
-    ActivityIndicator,
-    Modal,
+    View, Text, Pressable, TextInput, Image, ScrollView, ActivityIndicator, Modal, Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 import Screen from "../../src/components/ui/Screen";
 import TTButton from "../../src/components/ui/TTButton";
-import { useTTTheme } from "../../src/theme";
-import { useGlobalStyles } from "../../src/theme/globalStyles";
+import { useTTTheme, useGlobalStyles, makeEditStyles } from "../../src/theme/globalStyles";
 import { makeImageDataUrlFree } from "../../src/services/imageDataUrl";
 import { classifyPetTypeFromServer } from "../../src/services/ai";
-import { getPets, upsertPet } from "../../src/services/pets";
+import { getPets, upsertPet, calculateAge } from "../../src/services/pets";
 import { hexToRgba } from "../../src/utils/color";
 import { VIBES, PET_TYPES } from "../../src/config";
+import { useTTAlert } from "../../src/components/ui/TTAlert";
+import { debouncedPushSync } from "../../src/services/syncService";
+import { useEntitlements } from "../../src/state/entitlements";
 
 function normalizePetType(label) {
     const l = String(label || "").trim().toLowerCase();
@@ -34,57 +28,62 @@ function titleCase(s) {
     return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
 }
 
-// ✅ Helper: only return updatedAt when we actually have a meaningful value
 function computeUpdatedAt(nextType, prevUpdatedAt) {
     const n = normalizePetType(nextType);
-    if (n === "unknown") return prevUpdatedAt ?? null; // don't "freshen" unknown
+    if (n === "unknown") return prevUpdatedAt ?? null;
     return Date.now();
+}
+
+function formatDateDisplay(isoString) {
+    if (!isoString) return null;
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
 export default function EditPetScreen() {
     const params = useLocalSearchParams();
 
     const t = useTTTheme();
-    const gs = useGlobalStyles(t);
-    const styles = useMemo(() => makeStyles(t), [t]);
+    const g = useGlobalStyles(t);
+    const styles = useMemo(() => makeEditStyles(t), [t]);
+
     const id = params?.id ? String(params.id) : null;
     const prefillAvatarUri = params?.avatarUri ? String(params.avatarUri) : null;
+    const isEdit = !!id;
+    const title = useMemo(() => (isEdit ? "Edit Pet" : "New Pet"), [isEdit]);
 
     const [loading, setLoading] = useState(true);
     const [name, setName] = useState("");
     const [vibe, setVibe] = useState("Default Mode");
     const [avatarUri, setAvatarUri] = useState(null);
-
-    // Personality dropdown modal
     const [vibeModalOpen, setVibeModalOpen] = useState(false);
-
-    // Pet type
     const [petType, setPetType] = useState("unknown");
-    const [petTypeSource, setPetTypeSource] = useState("classify"); // "classify" | "manual"
+    const [petTypeSource, setPetTypeSource] = useState("classify");
     const [petTypeLoading, setPetTypeLoading] = useState(false);
+    const [birthDate, setBirthDate] = useState(null); // ISO string
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [tempDate, setTempDate] = useState(new Date());
 
-    const isEdit = !!id;
-    const title = useMemo(() => (isEdit ? "Edit Pet" : "New Pet"), [isEdit]);
-
-    // Tracks the avatar that was originally loaded (so we can detect user-changes)
     const initialAvatarRef = useRef(null);
-
-    // Tracks the last avatar we successfully classified
     const lastClassifiedAvatarRef = useRef(null);
-
-    // Tracks stored petTypeUpdatedAt (so we don't overwrite it with "unknown" saves)
     const storedUpdatedAtRef = useRef(null);
-
-    // Prevent auto-classify during initial load
     const didHydrateRef = useRef(false);
+    const classifyAttemptedRef = useRef(false);
+
+    const alert = useTTAlert();
+    const { deviceId } = useEntitlements();
+
+    const ageDisplay = useMemo(() => {
+        if (!birthDate) return null;
+        const age = calculateAge(birthDate);
+        return age?.label || null;
+    }, [birthDate]);
 
     useEffect(() => {
         let cancelled = false;
-
         (async () => {
             try {
-                if (__DEV__) console.log("[profiles/edit]", "mount", { id, isEdit, prefillAvatarUri });
-
                 if (isEdit) {
                     const pets = await getPets();
                     const pet = pets.find((p) => p?.id === id);
@@ -97,58 +96,36 @@ export default function EditPetScreen() {
                         setName(pet?.name || "");
                         setVibe(pet?.vibe || "Default Mode");
                         setAvatarUri(pet?.avatarUri || null);
-
                         initialAvatarRef.current = pet?.avatarUri || null;
-
                         setPetType(hydratedType);
                         setPetTypeSource(hydratedSource);
-
                         storedUpdatedAtRef.current = pet?.petTypeUpdatedAt ?? null;
-
                         lastClassifiedAvatarRef.current = pet?.petTypeUpdatedAt ? (pet?.avatarUri || null) : null;
-                        if (__DEV__) {
-                            console.log("[profiles/edit]", "hydrated(edit)", {
-                                petId: pet?.id,
-                                avatarUri: pet?.avatarUri,
-                                initialAvatar: initialAvatarRef.current,
-                                petTypeRaw: pet?.petType,
-                                petType: hydratedType,
-                                petTypeSource: hydratedSource,
-                                petTypeUpdatedAt: pet?.petTypeUpdatedAt,
-                                lastClassifiedAvatar: lastClassifiedAvatarRef.current,
-                            });
+                        classifyAttemptedRef.current = true;
+                        if (pet?.birthDate) {
+                            setBirthDate(pet.birthDate);
+                            setTempDate(new Date(pet.birthDate));
                         }
-                    } else {
-                        if (__DEV__) console.log("[profiles/edit]", "hydrated(edit) no pet found", { id, count: pets?.length });
                     }
                 } else if (prefillAvatarUri) {
                     setAvatarUri(prefillAvatarUri);
-                    initialAvatarRef.current = prefillAvatarUri;
-                    if (__DEV__) console.log("[profiles/edit]", "hydrated(new) prefill", { prefillAvatarUri });
+                    initialAvatarRef.current = null;
                 } else {
                     initialAvatarRef.current = null;
-                    if (__DEV__) console.log("[profiles/edit]", "hydrated(new) empty baseline");
                 }
             } finally {
                 if (!cancelled) {
                     setLoading(false);
                     didHydrateRef.current = true;
-                    if (__DEV__) console.log("[profiles/edit]", "hydrate complete");
                 }
             }
         })();
-
-        return () => {
-            cancelled = true;
-            if (__DEV__) console.log("[profiles/edit]", "unmount");
-        };
+        return () => { cancelled = true; };
     }, [id, isEdit, prefillAvatarUri]);
 
-    // --- Image picking helpers (camera + library) ---
     const ensurePicker = useCallback(async () => {
         try {
-            const ImagePicker = await import("expo-image-picker");
-            return ImagePicker;
+            return await import("expo-image-picker");
         } catch (e) {
             console.warn("expo-image-picker not available:", e?.message || e);
             return null;
@@ -158,183 +135,135 @@ export default function EditPetScreen() {
     const choosePhoto = useCallback(async () => {
         const mod = await ensurePicker();
         if (!mod || typeof mod.requestMediaLibraryPermissionsAsync !== "function") {
-            Alert.alert("Not available", "Photo picking isn’t available in this build.");
+            alert("Not available", "Photo picking isn't available in this build.");
             return;
         }
-
         const perm = await mod.requestMediaLibraryPermissionsAsync();
         if (!perm?.granted) {
-            Alert.alert("Permission needed", "Please allow photo library access to choose a pet photo.");
+            alert("Permission needed", "Please allow photo library access to choose a pet photo.");
             return;
         }
-
         const result = await mod.launchImageLibraryAsync({
             mediaTypes: mod.MediaTypeOptions.Images,
             quality: 0.9,
             allowsEditing: true,
             aspect: [4, 5],
         });
-
         if (result?.canceled) return;
-
         const uri = result?.assets?.[0]?.uri;
-        if (uri) {
-            if (__DEV__) console.log("[profiles/edit]", "choosePhoto setAvatarUri", { uri });
-            setAvatarUri(uri);
-        }
+        if (uri) setAvatarUri(uri);
     }, [ensurePicker]);
 
     const takePhoto = useCallback(async () => {
         const mod = await ensurePicker();
         if (!mod) {
-            Alert.alert("Not available", "Camera capture isn’t available in this build.");
+            alert("Not available", "Camera capture isn't available in this build.");
             return;
         }
-
         const perm = await mod.requestCameraPermissionsAsync();
         if (!perm?.granted) {
-            Alert.alert("Permission needed", "Please allow camera access to take a pet photo.");
+            alert("Permission needed", "Please allow camera access to take a pet photo.");
             return;
         }
-
         const result = await mod.launchCameraAsync({
             mediaTypes: mod.MediaTypeOptions.Images,
             quality: 0.9,
             allowsEditing: true,
             aspect: [4, 5],
         });
-
         if (result?.canceled) return;
-
         const uri = result?.assets?.[0]?.uri;
-        if (uri) {
-            if (__DEV__) console.log("[profiles/edit]", "takePhoto setAvatarUri", { uri });
-            setAvatarUri(uri);
-        }
+        if (uri) setAvatarUri(uri);
     }, [ensurePicker]);
 
     const runClassify = useCallback(
         async (opts = { force: false, reason: "unknown" }) => {
-            if (!avatarUri) {
-                if (__DEV__) console.log("[profiles/edit]", "runClassify skip (no avatar)", { reason: opts?.reason });
-                return;
-            }
-
-            if (!opts.force && lastClassifiedAvatarRef.current === avatarUri) {
-                if (__DEV__) {
-                    console.log("[profiles/edit]", "runClassify skip (already classified uri)", {
-                        reason: opts?.reason,
-                        avatarUri,
-                        lastClassifiedAvatar: lastClassifiedAvatarRef.current,
-                    });
-                }
-                return;
-            }
+            if (!avatarUri) return;
+            if (!opts.force && lastClassifiedAvatarRef.current === avatarUri) return;
 
             setPetTypeLoading(true);
-
             try {
                 const dataUrl = await makeImageDataUrlFree(avatarUri);
-
                 const out = await classifyPetTypeFromServer(dataUrl).catch((err) => {
-                    if (__DEV__) console.log("[profiles/edit]", "runClassify server error", { reason: opts?.reason, err: String(err?.message || err) });
+                    if (__DEV__) console.log("[profiles/edit]", "runClassify server error", { err: String(err?.message || err) });
                     return null;
                 });
 
-                if (__DEV__) console.log("[profiles/edit]", "runClassify server out", { reason: opts?.reason, out });
-
                 const rawLabel = out?.label;
-
-                if (!rawLabel) {
-                    if (__DEV__) console.log("[profiles/edit]", "runClassify no label -> keep existing", { reason: opts?.reason, petType });
-                    return;
-                }
+                if (!rawLabel) return;
 
                 const detected = normalizePetType(rawLabel);
-
-                if (detected === "unknown" && petType !== "unknown") {
-                    if (__DEV__) console.log("[profiles/edit]", "runClassify detected unknown -> keep existing", { reason: opts?.reason, rawLabel, petType });
-                    return;
-                }
+                if (detected === "unknown" && petType !== "unknown") return;
 
                 setPetType(detected);
                 setPetTypeSource("classify");
-
                 lastClassifiedAvatarRef.current = avatarUri;
-
                 if (detected !== "unknown") storedUpdatedAtRef.current = Date.now();
             } catch (e) {
-                if (__DEV__) console.warn("[profiles/edit] classify failed", e?.message || e);
-                if (__DEV__) console.log("[profiles/edit]", "runClassify exception", { reason: opts?.reason, err: String(e?.message || e) });
+                if (__DEV__) console.warn("[profiles/edit] classify error", e?.message || e);
             } finally {
+                classifyAttemptedRef.current = true;
                 setPetTypeLoading(false);
-                if (__DEV__) console.log("[profiles/edit]", "runClassify end", { reason: opts?.reason });
             }
         },
-        [avatarUri, petType, petTypeSource]
+        [avatarUri, petType]
     );
 
     useEffect(() => {
         let cancelled = false;
-
         (async () => {
-            if (!avatarUri) return;
-            if (!didHydrateRef.current) return;
-
-            const isHydration = avatarUri === initialAvatarRef.current;
-
-            if (isHydration) return;
+            if (!avatarUri || !didHydrateRef.current) return;
+            if (avatarUri === initialAvatarRef.current) return;
             if (petTypeSource === "manual") return;
-
             if (!cancelled) await runClassify({ force: false, reason: "avatarChanged" });
         })();
-
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [avatarUri, petTypeSource, runClassify]);
 
-    const canSave = useMemo(() => {
-        return String(name || "").trim().length > 0 && !!avatarUri;
-    }, [name, avatarUri]);
+    const canSave = useMemo(() =>
+            String(name || "").trim().length > 0 &&
+            !!avatarUri &&
+            !petTypeLoading &&
+            (petType !== "unknown" || classifyAttemptedRef.current) &&
+            !!birthDate
+        , [name, avatarUri, petTypeLoading, petType, birthDate]);
 
     const onSave = useCallback(async () => {
         const trimmed = String(name || "").trim();
-
         if (!avatarUri) {
-            Alert.alert("Pet photo required", "Add a photo so we can properly identify the tiny suspect.");
+            alert("Pet photo required", "Add a photo so we can properly identify the tiny suspect.");
             return;
         }
-
         if (!trimmed) {
-            Alert.alert("Name required", "Give your pet a name. Even if it’s ‘Sir Barks-a-lot’.");
+            alert("Name required", "Give your pet a name. Even if it's 'Sir Barks-a-lot'.");
             return;
         }
-
+        if (!birthDate) {
+            alert("Date of birth required", "Add your pet's birthday so we know how old they are.");
+            return;
+        }
         const normalized = normalizePetType(petType);
         const nextUpdatedAt = computeUpdatedAt(normalized, storedUpdatedAtRef.current);
-
         const pet = await upsertPet({
             id: id || undefined,
             name: trimmed,
             vibe: vibe === "Default Mode" ? null : vibe,
             avatarUri,
-
             petType: normalized,
             petTypeSource,
             petTypeUpdatedAt: nextUpdatedAt,
+            birthDate,
         });
-
         storedUpdatedAtRef.current = nextUpdatedAt;
-
-        router.back();
+        debouncedPushSync(deviceId);
+        router.replace("/profiles");
         return pet;
-    }, [name, vibe, avatarUri, id, petType, petTypeSource]);
+    }, [name, vibe, avatarUri, id, petType, petTypeSource, birthDate]);
 
     if (loading) {
         return (
-            <Screen style={styles.safe} edges={["top", "bottom"]}>
-                <View style={styles.center}>
+            <Screen style={[styles.safe, { backgroundColor: t.colors.cardBG }]} edges={["top", "bottom"]}>
+                <View style={g.center}>
                     <Text style={styles.loading}>Loading…</Text>
                 </View>
             </Screen>
@@ -342,12 +271,12 @@ export default function EditPetScreen() {
     }
 
     return (
-        <Screen style={styles.safe} edges={["top", "bottom"]}>
-            <View style={styles.header}>
-                <Pressable onPress={() => router.back()} style={styles.backBtn}>
-                    <Text style={styles.backBtnText}>Back</Text>
+        <Screen style={[styles.safe, { backgroundColor: t.colors.cardBG }]} edges={["top", "bottom"]}>
+            <View style={g.screenHeader}>
+                <Pressable onPress={() => router.back()} style={g.screenHeaderBtn}>
+                    <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
-                <Text style={styles.title}>{title}</Text>
+                <Text style={g.screenHeaderTitle}>{title}</Text>
                 <View style={{ width: 60 }} />
             </View>
 
@@ -368,10 +297,9 @@ export default function EditPetScreen() {
                         {avatarUri ? (
                             <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
                         ) : (
-                            <View style={styles.avatarEmpty}></View>
+                            <View style={styles.avatarEmpty} />
                         )}
-
-                        <View style={{ flex: 1 }}>
+                        <View style={g.flex}>
                             <Text style={styles.avatarTitle}>Profile picture</Text>
                             <Text style={styles.avatarSub}>For identification and future collab</Text>
                         </View>
@@ -387,8 +315,98 @@ export default function EditPetScreen() {
                     </View>
                 </View>
 
-                <Text style={styles.label}>Personality *</Text>
+                <Text style={styles.label}>Date of Birth *</Text>
+                <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    style={[styles.input, {
+                        justifyContent: "center",
+                        paddingVertical: 14,
+                    }]}
+                >
+                    <Text style={[
+                        { fontSize: 15 },
+                        birthDate
+                            ? { color: t.colors.text }
+                            : { color: hexToRgba(t.colors.text, 0.3) }
+                    ]}>
+                        {birthDate ? formatDateDisplay(birthDate) : "Select date of birth"}
+                    </Text>
+                </Pressable>
+                {ageDisplay && (
+                    <Text style={[styles.avatarSub, { marginTop: 8, marginBottom: -4, opacity: 0.7 }]}>
+                        Age: {ageDisplay}
+                    </Text>
+                )}
 
+                {/* Android — inline picker shown in modal */}
+                {showDatePicker && Platform.OS === "android" && (
+                    <DateTimePicker
+                        value={tempDate}
+                        mode="date"
+                        display="default"
+                        maximumDate={new Date()}
+                        minimumDate={new Date(1990, 0, 1)}
+                        onChange={(event, selectedDate) => {
+                            setShowDatePicker(false);
+                            if (event.type === "dismissed") return;
+                            if (selectedDate) {
+                                setTempDate(selectedDate);
+                                setBirthDate(selectedDate.toISOString());
+                            }
+                        }}
+                    />
+                )}
+
+                {/* iOS — spinner in a modal sheet */}
+                {Platform.OS === "ios" && (
+                    <Modal
+                        visible={showDatePicker}
+                        transparent
+                        animationType="slide"
+                        onRequestClose={() => setShowDatePicker(false)}
+                    >
+                        <Pressable
+                            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }}
+                            onPress={() => setShowDatePicker(false)}
+                        >
+                            <Pressable style={{
+                                position: "absolute",
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                backgroundColor: t.colors.cardBG,
+                                borderTopLeftRadius: 16,
+                                borderTopRightRadius: 16,
+                                padding: 16,
+                            }}>
+                                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                                    <Pressable onPress={() => setShowDatePicker(false)}>
+                                        <Text style={{ color: t.colors.text, opacity: 0.6, fontSize: 16 }}>Cancel</Text>
+                                    </Pressable>
+                                    <Pressable onPress={() => {
+                                        setBirthDate(tempDate.toISOString());
+                                        setShowDatePicker(false);
+                                    }}>
+                                        <Text style={{ color: t.colors.primary, fontWeight: "700", fontSize: 16 }}>Done</Text>
+                                    </Pressable>
+                                </View>
+                                <DateTimePicker
+                                    value={tempDate}
+                                    mode="date"
+                                    display="spinner"
+                                    maximumDate={new Date()}
+                                    minimumDate={new Date(1990, 0, 1)}
+                                    onChange={(_, selectedDate) => {
+                                        if (selectedDate) setTempDate(selectedDate);
+                                    }}
+                                    style={{ width: "100%" }}
+                                />
+                            </Pressable>
+                        </Pressable>
+                    </Modal>
+                )}
+
+                <Text style={styles.label}>Personality *</Text>
                 <Pressable onPress={() => setVibeModalOpen(true)} style={styles.dropdown} hitSlop={10}>
                     <Text style={styles.dropdownText}>{vibe || "Default Mode"}</Text>
                     <Text style={styles.dropdownChevron}>▾</Text>
@@ -409,14 +427,12 @@ export default function EditPetScreen() {
                                 </Text>
                             </View>
                         )}
-
                         <Pressable
                             onPress={async () => {
-                                if (__DEV__) console.log("[profiles/edit]", "redetect pressed");
                                 setPetTypeSource("classify");
                                 await runClassify({ force: true, reason: "redetect" });
                             }}
-                            style={[styles.typeBtn, styles.detectBtn]}
+                            style={styles.detectBtn}
                             hitSlop={10}
                             disabled={!avatarUri || petTypeLoading}
                         >
@@ -427,20 +443,22 @@ export default function EditPetScreen() {
 
                 <TTButton
                     variant="success"
-                    title={isEdit ? "Save Changes" : "Create Profile"}
+                    title={
+                        petTypeLoading
+                            ? "Detecting pet type…"
+                            : petType === "unknown" && avatarUri && !classifyAttemptedRef.current
+                                ? "Detecting…"
+                                : petType === "unknown" && avatarUri
+                                    ? "Couldn't detect type — try Redetect"
+                                    : isEdit ? "Save Changes" : "Create Profile"
+                    }
                     onPress={onSave}
                     disabled={!canSave}
                     style={styles.primaryBtn}
                 />
             </ScrollView>
 
-            {/* ✅ Personality modal dropdown */}
-            <Modal
-                visible={vibeModalOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setVibeModalOpen(false)}
-            >
+            <Modal visible={vibeModalOpen} transparent animationType="fade" onRequestClose={() => setVibeModalOpen(false)}>
                 <Pressable style={styles.modalBackdrop} onPress={() => setVibeModalOpen(false)}>
                     <Pressable style={styles.modalCard} onPress={() => {}}>
                         <View style={styles.modalHeader}>
@@ -449,20 +467,16 @@ export default function EditPetScreen() {
                                 <Text style={styles.modalClose}>Close</Text>
                             </Pressable>
                         </View>
-
                         <ScrollView style={styles.modalList} contentContainerStyle={{ paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
                             {VIBES.map((v) => {
                                 const selected = v === (vibe || "Default Mode");
                                 return (
                                     <Pressable
                                         key={v}
-                                        onPress={() => {
-                                            setVibe(v);
-                                            setVibeModalOpen(false);
-                                        }}
+                                        onPress={() => { setVibe(v); setVibeModalOpen(false); }}
                                         style={[styles.modalRow, selected && styles.modalRowSelected]}
                                     >
-                                        <Text style={[styles.modalRowText, selected && styles.modalRowTextSelected]}>
+                                        <Text style={[styles.modalRowText, selected && styles.modalRowText]}>
                                             {v}
                                         </Text>
                                         {selected ? <Text style={styles.modalCheck}>✓</Text> : null}
@@ -476,212 +490,3 @@ export default function EditPetScreen() {
         </Screen>
     );
 }
-
-const makeStyles = (t) =>
-    StyleSheet.create({
-        safe: { flex: 1, backgroundColor: t.colors.bg },
-
-        header: {
-            paddingHorizontal: 16,
-            paddingTop: 8,
-            paddingBottom: 10,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottomWidth: 1,
-            borderColor: t.colors.border,
-            backgroundColor: t.colors.cardBG,
-        },
-        backBtn: { paddingVertical: 10, paddingHorizontal: 10 },
-        backBtnText: { color: t.colors.text, fontWeight: "600" },
-        title: { fontSize: 18, fontWeight: "600", color: t.colors.text },
-
-        content: { paddingHorizontal: 20, paddingVertical: 5 },
-        label: { marginTop: 14, marginBottom: 8, fontWeight: "600", color: t.colors.text },
-
-        avatarRow: { marginTop: 14, gap: 10 },
-
-        avatarPreview: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-            padding: 12,
-            borderRadius: 12,
-            backgroundColor: "rgba(255,255,255,0.03)",
-        },
-        avatarPreviewMissing: {
-            borderWidth: 1,
-            borderColor: t.colors.danger,
-            borderStyle: "dashed",
-            backgroundColor: hexToRgba(t.colors.danger, 0.06),
-        },
-
-        avatarImg: { width: 78, height: 98, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.03)" },
-        avatarEmpty: {
-            width: 78,
-            height: 98,
-            borderRadius: 12,
-            backgroundColor: "rgba(255,255,255,0.03)",
-            alignItems: "center",
-            justifyContent: "center",
-        },
-
-        avatarTitle: { fontWeight: "600", color: t.colors.text },
-        avatarSub: { marginTop: 2, color: t.colors.textMuted, fontSize: 13 },
-
-        avatarBtns: { flexDirection: "row", gap: 10 },
-        smallBtn: {
-            flex: 1,
-            paddingVertical: 12,
-            borderRadius: 12,
-            backgroundColor: t.colors.primary,
-            alignItems: "center",
-        },
-        smallBtnSecondary: {
-            backgroundColor: t.colors.secondary
-        },
-        smallBtnText: { color: t.colors.textOverPrimary, fontWeight: "600" },
-        smallBtnSecondaryText: { color: t.colors.textOverSecondary },
-
-        // ✅ Dropdown styles
-        dropdown: {
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingVertical: 12,
-            paddingHorizontal: 14,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: t.colors.border,
-            backgroundColor: "rgba(255,255,255,0.03)",
-        },
-        dropdownText: {
-            color: t.colors.text,
-            fontSize: 16,
-            fontWeight: "600",
-            flex: 1,
-        },
-        dropdownChevron: {
-            color: t.colors.textMuted,
-            fontSize: 18,
-            fontWeight: "600",
-            marginLeft: 10,
-        },
-        dropdownHint: {
-            marginTop: 6,
-            color: t.colors.textMuted,
-            fontSize: 12,
-        },
-
-        typeRow: {
-            marginTop: 20,
-            paddingHorizontal: 2,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-        },
-        typeLabel: { fontWeight: "600", color: t.colors.textMuted },
-        typeRight: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" },
-        typePill: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingVertical: 7,
-            paddingHorizontal: 10,
-            borderRadius: 999,
-            backgroundColor: "rgba(255,255,255,0.06)",
-            borderWidth: 1,
-            borderColor: t.colors.border,
-            maxWidth: 200,
-        },
-        typePillText: { fontWeight: "600", color: t.colors.textMuted },
-        typeBtn: {
-            paddingVertical: 7,
-            paddingHorizontal: 10,
-            borderRadius: 10,
-            backgroundColor: "rgba(255,124,64,0.12)",
-        },
-
-        detectBtn: {
-            backgroundColor: t.colors.danger,
-        },
-        detectBtnText: { color: t.colors.textOverDanger, fontWeight: "600" },
-
-        input: {
-            paddingVertical: 12,
-            paddingHorizontal: 14,
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: t.colors.border,
-            backgroundColor: "rgba(255,255,255,0.03)",
-            fontSize: 16,
-            color: t.colors.text,
-        },
-
-        primaryBtn: { marginTop: 18 },
-
-        center: { flex: 1, alignItems: "center", justifyContent: "center" },
-        loading: { fontWeight: "600", color: "rgba(0,0,0,0.7)" },
-
-        // ✅ Modal dropdown styles
-        modalBackdrop: {
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            padding: 18,
-            justifyContent: "center",
-        },
-        modalCard: {
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: t.colors.border,
-            backgroundColor: t.colors.bg,
-            overflow: "hidden",
-            maxHeight: "80%",
-        },
-        modalHeader: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: t.colors.border,
-        },
-        modalTitle: {
-            fontWeight: "700",
-            color: t.colors.text,
-            fontSize: 16,
-        },
-        modalClose: {
-            fontWeight: "700",
-            color: t.colors.textMuted,
-        },
-        modalList: {
-            paddingHorizontal: 8,
-            paddingVertical: 8,
-            flexGrow: 1,
-        },
-        modalRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingVertical: 12,
-            paddingHorizontal: 12,
-            borderRadius: 12,
-        },
-        modalRowSelected: {
-            backgroundColor: "rgba(255,255,255,0.06)",
-            borderWidth: 1,
-            borderColor: t.colors.border,
-        },
-        modalRowText: {
-            color: t.colors.text,
-            fontWeight: "600",
-        },
-        modalRowTextSelected: {
-            color: t.colors.text,
-        },
-        modalCheck: {
-            color: t.colors.textMuted,
-            fontWeight: "800",
-        },
-    });

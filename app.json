@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Tiny Tales",
+    "name": "Smart Tails",
     "slug": "tiny-tales",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1B1F2A",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -62,7 +62,7 @@
       "expo-secure-store",
       "react-native-iap",
       "expo-web-browser",
-      "@sentry/react-native"
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

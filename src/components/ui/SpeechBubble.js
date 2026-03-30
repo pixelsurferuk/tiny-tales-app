@@ -1,16 +1,16 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 
-export default function SpeechBubble({ text }) {
+export default function SpeechBubble({ text, customContent }) {
     return (
         <View style={styles.wrapper}>
             <View style={styles.bubble}>
-                <Text style={styles.text}>{text}</Text>
+                {customContent ?? <Text style={styles.text}>{text}</Text>}
             </View>
-
-            {/* Tail */}
-            <View style={styles.tailShadow} />
-            <View style={styles.tail} />
+            {/* Thought bubble tail — three circles descending */}
+            <View style={styles.dot1} />
+            <View style={styles.dot2} />
+            <View style={styles.dot3} />
         </View>
     );
 }
@@ -19,6 +19,7 @@ const styles = StyleSheet.create({
     wrapper: {
         width: "100%",
         alignItems: "center",
+        paddingBottom: 28, // room for the thought dots
     },
 
     bubble: {
@@ -26,7 +27,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#FFFFFF",
         paddingVertical: 20,
         paddingHorizontal: 20,
-        borderRadius: 12,
+        borderRadius: 30,
         shadowColor: "#000",
         shadowOpacity: 0.30,
         shadowRadius: 8,
@@ -39,31 +40,49 @@ const styles = StyleSheet.create({
         lineHeight: 22,
         textAlign: "center",
         color: "#2E2E2E",
-        fontWeight: "400",
+        fontFamily: "Nunito_400Regular",
     },
 
-    tailShadow: {
+    // Large dot — closest to bubble
+    dot1: {
         position: "absolute",
-        bottom: -12,
-        left: '50%',
-        marginLeft: -10,
-        width: 20,
-        height: 20,
-        backgroundColor: "#000",
-        transform: [{ rotate: "45deg" }],
-        opacity: 0.1,
-        borderRadius: 3,
-    },
-
-    tail: {
-        position: "absolute",
-        bottom: -8,
-        left: '50%',
-        width: 20,
-        height: 20,
-        marginLeft: -10,
+        bottom: 10,
+        right: "55%",
+        width: 40,
+        height: 40,
+        borderRadius: 999,
         backgroundColor: "#FFFFFF",
-        transform: [{ rotate: "45deg" }],
-        borderRadius: 3,
+    },
+
+    // Medium dot
+    dot2: {
+        position: "absolute",
+        bottom: -15,
+        right: "48%",
+        width: 30,
+        height: 30,
+        borderRadius: 999,
+        backgroundColor: "#FFFFFF",
+        shadowColor: "#000",
+        shadowOpacity: 0.12,
+        shadowRadius: 2,
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 2,
+    },
+
+    // Small dot — furthest from bubble
+    dot3: {
+        position: "absolute",
+        bottom: -30,
+        right: "43%",
+        width: 15,
+        height: 15,
+        borderRadius: 999,
+        backgroundColor: "#FFFFFF",
+        shadowColor: "#000",
+        shadowOpacity: 0.1,
+        shadowRadius: 1,
+        shadowOffset: { width: 0, height: 1 },
+        elevation: 1,
     },
 });

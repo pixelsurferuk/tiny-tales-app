@@ -1,17 +1,24 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { View, Text, StyleSheet, Pressable, Image, Alert, ScrollView } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { View, Text, Pressable, Image, ScrollView } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import Screen from "../../src/components/ui/Screen";
 import TTButton from "../../src/components/ui/TTButton";
-import { useTTTheme } from "../../src/theme";
-import { getPets, deletePet, setActivePetId, getActivePetId } from "../../src/services/pets";
+import { useTTTheme, useGlobalStyles, makeProfilesStyles } from "../../src/theme/globalStyles";
+import { getPets, deletePet, setActivePetId, getActivePetId, summarizePetForPrompt } from "../../src/services/pets";
 import { AppBannerAd } from "../../src/ads/admob";
 import { useEntitlements } from "../../src/state/entitlements";
+import { useTTAlert } from "../../src/components/ui/TTAlert";
+import { useAdGate } from "../../src/ads/useAdGate";
+import PetTips from "../../src/components/ui/PetTips";
+import AuthCreditsBar from "../../src/components/auth/AuthCreditsBar";
+import { debouncedPushSync } from "../../src/services/syncService";
+import { getLocalStreak, getTodayChallenge, getGlobalDaysLeft } from "../../src/services/challengeService";
 
-function requiresPhoto(pet, action) {
+function requiresPhoto(pet, action, alert) {
     if (!pet.avatarUri) {
-        Alert.alert("No photo", `This profile needs a photo first so we've got something to ${action}.`);
+        alert("No photo", `This profile needs a photo first so we've got something to ${action}.`);
         return true;
     }
     return false;
@@ -19,23 +26,53 @@ function requiresPhoto(pet, action) {
 
 export default function ProfilesScreen() {
     const params = useLocalSearchParams();
-    const mode = params?.mode ? String(params.mode) : null;
-    const isSelectMode = mode === "select";
+    const isSelectMode = params?.mode === "select";
 
     const [pets, setPets] = useState([]);
     const [activeId, setActiveId] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [challengeData, setChallengeData] = useState({}); // { [petId]: { streak, todayDone, daysLeft } }
 
     const t = useTTTheme();
-    const styles = useMemo(() => makeStyles(t), [t]);
-    const { isPro } = useEntitlements();
+    const g = useGlobalStyles(t);
+    const styles = useMemo(() => makeProfilesStyles(t), [t]);
+    const { isPro, server, refreshAll, deviceId } = useEntitlements();
+    const alert = useTTAlert();
+
+    const pendingConfirmedRef = useRef(null);
+
+    const { tryWatchAd } = useAdGate({
+        onCreditsGranted: () => {
+            refreshAll({ reason: "profiles_ad_credit" });
+            pendingConfirmedRef.current?.();
+            pendingConfirmedRef.current = null;
+        },
+        onLimitReached: () => router.push("/paywall"),
+    });
 
     const load = useCallback(async () => {
         try {
             setLoading(true);
             const [list, aid] = await Promise.all([getPets(), getActivePetId()]);
-            setPets(Array.isArray(list) ? list : []);
+            const petList = Array.isArray(list) ? list : [];
+            setPets(petList);
             setActiveId(aid || null);
+
+            // Server date wins — prevents trial reset on login
+            const globalDaysLeft = getGlobalDaysLeft(server?.challengeTrialStartedAt || null);
+            const challengeMap = {};
+            await Promise.all(petList.map(async (pet) => {
+                const [streak, cached] = await Promise.all([
+                    getLocalStreak(pet.id),
+                    getTodayChallenge(pet.id),
+                ]);
+                challengeMap[pet.id] = {
+                    streak: streak.count || 0,
+                    todayDone: !!(cached?.completedAt),
+                    daysLeft: globalDaysLeft, // same for all pets
+                };
+            }));
+            setChallengeData(challengeMap);
         } catch (e) {
             console.warn("[profiles] load failed", e?.message || e);
             setPets([]);
@@ -54,86 +91,112 @@ export default function ProfilesScreen() {
     }, [isSelectMode]);
 
     const onDelete = useCallback((pet) => {
-        Alert.alert(
+        alert(
             "Delete profile?",
             `This removes ${pet?.name || "this pet"} from profiles.`,
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Delete",
-                    style: "destructive",
+                    text: "Delete", style: "destructive",
                     onPress: async () => {
                         try {
                             await deletePet(pet.id);
+                            debouncedPushSync(deviceId);
                             await load();
-                        } catch (e) {
-                            Alert.alert("Delete failed", e?.message || "Couldn't delete profile.");
                         }
+                        catch (e) { alert("Delete failed", e?.message || "Couldn't delete profile."); }
                     },
                 },
             ]
         );
-    }, [load]);
+    }, [load, deviceId]);
 
     const onGetThought = useCallback(async (pet) => {
-        if (requiresPhoto(pet, "judge")) return;
+        if (requiresPhoto(pet, "judge", alert)) return;
         await setActivePetId(pet.id);
         setActiveId(pet.id);
         router.push({
             pathname: "/preview",
-            params: {
-                uri: pet.avatarUri,
-                src: "profiles",
-                petId: pet.id,
-                ...(pet.petType ? { hintLabel: pet.petType } : {}),
-            },
+            params: { uri: pet.avatarUri, src: "profiles", petId: pet.id, ...(pet.petType ? { hintLabel: pet.petType } : {}) },
         });
     }, []);
 
     const onChat = useCallback(async (pet) => {
-        if (requiresPhoto(pet, "chat")) return;
+        if (requiresPhoto(pet, "chat", alert)) return;
         await setActivePetId(pet.id);
         setActiveId(pet.id);
         router.push({ pathname: "/ask", params: { uri: pet.avatarUri, src: "profiles", petId: pet.id } });
     }, []);
 
-    const headerTitle = isSelectMode ? "Select a Pet" : "Pet Profiles";
+    const handleBeforeGenerate = useCallback((pet, tab, onConfirmed, onCancel) => {
+        const creditsRemaining = server?.creditsRemaining ?? 0;
+
+        if (!isPro && creditsRemaining <= 0) {
+            pendingConfirmedRef.current = onConfirmed;
+            tryWatchAd();
+            return;
+        }
+
+        if (!isPro) {
+            alert(
+                "Uses 1 credit",
+                `Getting a ${tab === "training" ? "training tip" : "brain game"} uses 1 credit. You have ${creditsRemaining} remaining.`,
+                [
+                    { text: "Continue", onPress: onConfirmed },
+                    { text: "Cancel", style: "cancel", onPress: onCancel },
+                ]
+            );
+            return;
+        }
+
+        onConfirmed();
+    }, [isPro, server?.creditsRemaining, tryWatchAd]);
+
+    const tabBtn = (active) => ({
+        flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+        gap: 6, paddingVertical: 9, borderRadius: 10,
+        backgroundColor: active ? t.colors.primary : t.colors.cardBG,
+        borderWidth: 1, borderColor: active ? t.colors.primary : t.colors.text + "18",
+    });
+
+    const tabBtnText = (active) => ({
+        fontSize: 13, fontWeight: "600",
+        color: active ? t.colors.textOverPrimary : t.colors.text,
+    });
 
     return (
         <Screen style={styles.safe} edges={["top", "bottom"]}>
             <AppBannerAd enabled={!isPro} refreshKey="profiles" />
 
-            <View style={styles.header}>
-                <Pressable onPress={() => router.back()} style={styles.headerBtn}>
-                    <Text style={styles.headerBtnText}>Back</Text>
+            <View style={g.screenHeader}>
+                <Pressable onPress={() => router.replace("/")} style={g.screenHeaderBtn}>
+                    <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
-                <Text style={styles.title}>{headerTitle}</Text>
-                <Pressable onPress={() => router.push("/profiles/edit")} style={styles.headerBtn}>
-                    <Text style={styles.headerBtnText}>Add</Text>
+                <Text style={g.screenHeaderTitle}>{isSelectMode ? "Select a Pet" : "Pet Profiles"}</Text>
+                <Pressable onPress={() => router.push("/profiles/edit")} style={g.screenHeaderBtn}>
+                    <Text style={g.screenHeaderBtnText}>Add</Text>
                 </Pressable>
             </View>
 
+            <AuthCreditsBar compact />
+
             {loading ? (
-                <View style={styles.center}>
+                <View style={g.center}>
                     <Text style={styles.loading}>Loading…</Text>
                 </View>
             ) : pets.length === 0 ? (
                 <View style={styles.empty}>
                     <Text style={styles.emptyTitle}>No profiles yet</Text>
                     <Text style={styles.emptySub}>Add a pet so their judgement stays consistent.</Text>
-                    <TTButton
-                        title="Create Pet Profile"
-                        onPress={() => router.push("/profiles/edit")}
-                        style={styles.primaryBtn}
-                    />
+                    <TTButton title="Create Pet Profile" onPress={() => router.push("/profiles/edit")} />
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
                     {pets.map((pet) => {
-                        const selected = pet.id === activeId;
+                        const cd = challengeData[pet.id];
                         return (
                             <View key={pet.id} style={styles.card}>
-                                <Pressable onPress={() => onPickActive(pet.id)} style={styles.row} hitSlop={10}>
+                                <Pressable onPress={() => onPickActive(pet.id)} style={[g.row, { gap: 12 }]} hitSlop={10}>
                                     <View style={styles.avatarWrap}>
                                         {pet.avatarUri ? (
                                             <Image source={{ uri: pet.avatarUri }} style={styles.avatar} />
@@ -144,41 +207,81 @@ export default function ProfilesScreen() {
                                         )}
                                     </View>
 
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.name} numberOfLines={1}>
-                                            {pet.name || "Unnamed"}
-                                        </Text>
-                                        <Text style={styles.sub} numberOfLines={1}>
-                                            {pet.vibe || "Default voice"}
-                                        </Text>
+                                    <View style={g.flex}>
+                                        <Text style={styles.name} numberOfLines={1}>{pet.name || "Unnamed"}</Text>
+                                        <Text style={styles.sub} numberOfLines={1}>{pet.vibe || "Default voice"}</Text>
                                     </View>
 
                                     <View style={styles.actions}>
                                         <Pressable
                                             onPress={() => router.push({ pathname: "/profiles/edit", params: { id: pet.id } })}
-                                            style={styles.actionBtn}
+                                            style={[styles.actionBtnBase, styles.actionBtnEdit]}
                                             hitSlop={10}
                                         >
-                                            <Text style={styles.actionBtnText}>Edit</Text>
+                                            <Text style={[styles.actionBtnLabel, styles.actionBtnEditText]}>Edit</Text>
                                         </Pressable>
-
-                                        <Pressable onPress={() => onDelete(pet)} style={styles.actionBtnDanger} hitSlop={10}>
-                                            <Text style={styles.actionBtnDangerText}>Delete</Text>
+                                        <Pressable
+                                            onPress={() => onDelete(pet)}
+                                            style={[styles.actionBtnBase, styles.actionBtnDelete]}
+                                            hitSlop={10}
+                                        >
+                                            <Text style={[styles.actionBtnLabel, styles.actionBtnDeleteText]}>Delete</Text>
                                         </Pressable>
                                     </View>
                                 </Pressable>
 
-                                <TTButton
-                                    title={`Get ${pet.name || "Pet"}'s Quick Thought`}
-                                    onPress={() => onGetThought(pet)}
-                                    style={styles.actionSpacing}
-                                />
+                                {/* Thoughts + Chat */}
+                                <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                                    <Pressable style={tabBtn(false)} onPress={() => onGetThought(pet)}>
+                                        <Ionicons name="bulb-outline" size={15} color={t.colors.text} />
+                                        <Text style={tabBtnText(false)}>Thoughts</Text>
+                                    </Pressable>
+                                    <Pressable style={tabBtn(false)} onPress={() => onChat(pet)}>
+                                        <Ionicons name="chatbubble-outline" size={15} color={t.colors.text} />
+                                        <Text style={tabBtnText(false)}>Chat</Text>
+                                    </Pressable>
+                                </View>
 
-                                <TTButton
-                                    title={`Chat with ${pet.name || "Pet"}`}
-                                    variant="secondary"
-                                    onPress={() => onChat(pet)}
-                                    style={styles.actionSpacing}
+                                {/* Challenge streak row */}
+                                {cd ? (
+                                    <Pressable
+                                        onPress={() => router.push({ pathname: "/challenge", params: { petId: pet.id } })}
+                                        style={{
+                                            flexDirection: "row", alignItems: "center",
+                                            gap: 10, marginTop: 8, paddingVertical: 8,
+                                            paddingHorizontal: 10, borderRadius: 10,
+                                            backgroundColor: t.colors.bg,
+                                            borderWidth: 1, borderColor: t.colors.text + "18",
+                                        }}
+                                    >
+                                        <Text style={{ fontSize: 16 }}>🏆</Text>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[g.text, { fontSize: 13, fontWeight: "600" }]}>
+                                                {cd.streak > 0
+                                                    ? `${cd.streak >= 30 ? "🥇" : cd.streak >= 14 ? "🥈" : cd.streak >= 7 ? "🥉" : "🐾"} ${cd.streak} day streak`
+                                                    : "Start a challenge streak!"}
+                                            </Text>
+                                            <Text style={[g.text, { fontSize: 11, opacity: 0.6 }]}>
+                                                {isPro ? "Pro" : cd.daysLeft > 0 ? `${cd.daysLeft} free days left` : "Trial ended — Go Pro"}
+                                            </Text>
+                                        </View>
+                                        {cd.todayDone ? (
+                                            <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                                        ) : (
+                                            <View style={{
+                                                backgroundColor: t.colors.primary, borderRadius: 6,
+                                                paddingHorizontal: 8, paddingVertical: 3,
+                                            }}>
+                                                <Text style={{ color: t.colors.textOverPrimary, fontSize: 11, fontWeight: "700" }}>GO</Text>
+                                            </View>
+                                        )}
+                                    </Pressable>
+                                ) : null}
+
+                                {/* PetTips always visible */}
+                                <PetTips
+                                    pet={summarizePetForPrompt(pet)}
+                                    onBeforeGenerate={(tab, onConfirmed, onCancel) => handleBeforeGenerate(pet, tab, onConfirmed, onCancel)}
                                 />
                             </View>
                         );
@@ -188,69 +291,3 @@ export default function ProfilesScreen() {
         </Screen>
     );
 }
-
-const makeStyles = (t) =>
-    StyleSheet.create({
-        safe: { flex: 1, backgroundColor: t.colors.bg },
-
-        header: {
-            paddingHorizontal: 16,
-            paddingTop: 8,
-            paddingBottom: 10,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottomWidth: 1,
-            borderColor: t.colors.border,
-            backgroundColor: t.colors.cardBG,
-        },
-        headerBtn: { paddingVertical: 10, paddingHorizontal: 10 },
-        headerBtnText: { color: t.colors.text, fontWeight: "600" },
-        title: { fontSize: 18, fontWeight: "600", color: t.colors.text },
-
-        center: { flex: 1, alignItems: "center", justifyContent: "center" },
-        loading: { fontWeight: "600", color: t.colors.textMuted },
-
-        empty: { flex: 1, padding: 20, alignItems: "center", justifyContent: "center" },
-        emptyTitle: { fontSize: 18, fontWeight: "600", color: t.colors.text },
-        emptySub: { marginTop: 8, marginBottom: 20, color: t.colors.textMuted, textAlign: "center" },
-
-        list: { padding: 16, paddingBottom: 28, gap: 12 },
-
-        card: {
-            borderRadius: 18,
-            borderWidth: 1,
-            borderColor: t.colors.border,
-            backgroundColor: "rgba(255,255,255,0.04)",
-            padding: 12,
-        },
-        cardSelected: { borderColor: t.colors.primary, borderWidth: 2 },
-
-        row: { flexDirection: "row", alignItems: "center", gap: 12 },
-
-        avatarWrap: { width: 70, height: 90 },
-        avatar: { width: 70, height: 90, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.06)" },
-        avatarFallback: { alignItems: "center", justifyContent: "center" },
-        avatarFallbackText: { fontSize: 20, fontWeight: "600", color: "rgba(0,0,0,0.35)" },
-
-        name: { fontWeight: "600", color: t.colors.text, fontSize: 16 },
-        sub: { marginTop: 2, color: t.colors.textMuted, fontWeight: "700", fontSize: 12 },
-
-        actions: { alignItems: "flex-end", gap: 8 },
-        actionBtn: {
-            paddingVertical: 10,
-            paddingHorizontal: 15,
-            borderRadius: 10,
-            backgroundColor: t.colors.success,
-        },
-        actionBtnText: { color: t.colors.textOverSuccess, fontWeight: "600", fontSize: 12, textAlign: "center",  width: 65 },
-        actionBtnDanger: {
-            paddingVertical: 10,
-            paddingHorizontal: 15,
-            borderRadius: 10,
-            backgroundColor: t.colors.danger,
-        },
-        actionBtnDangerText: { color: t.colors.textOverDanger, fontWeight: "600", fontSize: 12, textAlign: "center",  width: 65  },
-
-        actionSpacing: { marginTop: 10 },
-    });

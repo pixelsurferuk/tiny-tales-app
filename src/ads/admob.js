@@ -2,17 +2,16 @@ import React from "react";
 import { View, Platform } from "react-native";
 import Constants from "expo-constants";
 import { BANNER_AD_UNIT_IDS } from "../config";
-import { useTTTheme } from "../theme";
+import { useTTTheme } from "../theme/globalStyles";
 
 const isExpoGo = Constants.appOwnership === "expo";
 
-// Conditionally require — top-level import crashes in Expo Go
-let BannerAd       = null;
-let BannerAdSize   = null;
-let TestIds        = null;
+let BannerAd     = null;
+let BannerAdSize = null;
+let TestIds      = null;
 
 if (!isExpoGo) {
-    const ads  = require("react-native-google-mobile-ads");
+    const ads = require("react-native-google-mobile-ads");
     BannerAd     = ads.BannerAd;
     BannerAdSize = ads.BannerAdSize;
     TestIds      = ads.TestIds;

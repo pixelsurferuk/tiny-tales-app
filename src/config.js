@@ -37,7 +37,7 @@ export const RC_ENTITLEMENT_ID = "pro_access";
 
 // ─── Ads ──────────────────────────────────────────────────────────────────────
 
-export const BANNER_AD_UNIT_IDS = {
+/*export const BANNER_AD_UNIT_IDS = {
     ios:     "ca-app-pub-5887472906492199/5644835923",
     android: "ca-app-pub-5887472906492199/5644835923",
 };
@@ -45,6 +45,16 @@ export const BANNER_AD_UNIT_IDS = {
 export const REWARDED_AD_UNIT_IDS = {
     ios:     "ca-app-pub-5887472906492199/8799767245",
     android: "ca-app-pub-5887472906492199/8799767245",
+};*/
+
+export const BANNER_AD_UNIT_IDS = {
+    ios:     "ca-app-pub-3940256099942544/2934735716",
+    android: "ca-app-pub-3940256099942544/6300978111",
+};
+
+export const REWARDED_AD_UNIT_IDS = {
+    ios:     "ca-app-pub-3940256099942544/1712485313",
+    android: "ca-app-pub-3940256099942544/5224354917",
 };
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
