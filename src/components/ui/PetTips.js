@@ -1,5 +1,5 @@
 // src/components/ui/PetTips.js
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -40,7 +40,7 @@ function getPoolKey(petType, ageRange, tipType) {
     return `tiny_tales_pool_${petType}_${ageRange}_${tipType}`;
 }
 
-export default function PetTips({ pet, onBeforeGenerate }) {
+export default function PetTips({ pet, onBeforeGenerate, initialTab }) {
     const t = useTTTheme();
     const g = useGlobalStyles(t);
     const { deviceId, setCreditsLocal } = useEntitlements();
@@ -168,6 +168,12 @@ export default function PetTips({ pet, onBeforeGenerate }) {
         }
     }, [activeTab, loadPoolAndSeen]);
 
+    // Auto-open initial tab when navigated to with a pre-selected tab
+    useEffect(() => {
+        if (initialTab) handleTabPress(initialTab);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Get Tip / Next Tip — this is where credit is spent
     const handleGetTip = useCallback(() => {
         if (!activeTab) return;
@@ -212,14 +218,6 @@ export default function PetTips({ pet, onBeforeGenerate }) {
         }
     }, [activeTab, loadPoolAndSeen, fetchPool, saveSeen, onBeforeGenerate]);
 
-    const handleClose = useCallback(() => {
-        setActiveTab(null);
-        setPool([]);
-        setSeenIds([]);
-        setHasLoaded(false);
-        setError(null);
-    }, []);
-
     const visibleTips = pool.filter(t => seenIds.includes(t.id));
     const currentTip = visibleTips[currentIndex] || null;
     const allSeen = pool.length >= POOL_SIZE && seenIds.length >= POOL_SIZE;
@@ -234,9 +232,18 @@ export default function PetTips({ pet, onBeforeGenerate }) {
 
     return (
         <View style={{ marginTop: 8 }}>
-            {/* Tab row — free to open, no credit check */}
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: activeTab ? 10 : 0 }}>
+            {/* Tab row — segmented control */}
+            <View style={{
+                flexDirection: "row",
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: t.colors.text + "20",
+                backgroundColor: t.colors.cardBG,
+                padding: 3,
+                marginBottom: 12,
+            }}>
                 {TABS.map((tab) => {
+                    const isActive = activeTab === tab.key;
                     return (
                         <Pressable
                             key={tab.key}
@@ -249,18 +256,18 @@ export default function PetTips({ pet, onBeforeGenerate }) {
                                 gap: 6,
                                 paddingVertical: 9,
                                 borderRadius: 8,
-                                backgroundColor: t.colors.primary,
+                                backgroundColor: isActive ? t.colors.primary : "transparent",
                             }}
                         >
                             <Ionicons
                                 name={tab.icon}
                                 size={15}
-                                color={t.colors.textOverPrimary}
+                                color={isActive ? t.colors.textOverPrimary : t.colors.textMuted}
                             />
                             <Text style={{
                                 fontSize: 13,
                                 fontWeight: "600",
-                                color: t.colors.textOverPrimary,
+                                color: isActive ? t.colors.textOverPrimary : t.colors.textMuted,
                             }}>
                                 {tab.label}
                             </Text>
@@ -279,24 +286,11 @@ export default function PetTips({ pet, onBeforeGenerate }) {
                     padding: 16,
                 }}>
                     {/* Header */}
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <Text style={[g.text, { fontSize: 12, opacity: 0.5 }]}>
-                            {visibleTips.length > 0
-                                ? `${currentIndex + 1} of ${pool.length >= POOL_SIZE ? POOL_SIZE : `${visibleTips.length}+`}`
-                                : ""}
+                    {visibleTips.length > 0 && (
+                        <Text style={[g.text, { fontSize: 12, opacity: 0.5, marginBottom: 10 }]}>
+                            {`${currentIndex + 1} of ${pool.length >= POOL_SIZE ? POOL_SIZE : `${visibleTips.length}+`}`}
                         </Text>
-                        <Pressable
-                            onPress={handleClose}
-                            style={{
-                                width: 44, height: 44, borderRadius: 999,
-                                alignItems: "center", justifyContent: "center",
-                                borderWidth: 1, borderColor: t.colors.text + "22",
-                            }}
-                            hitSlop={10}
-                        >
-                            <Ionicons name="close" size={20} color={t.colors.text} />
-                        </Pressable>
-                    </View>
+                    )}
 
                     {loading ? (
                         <View style={{ alignItems: "center", paddingVertical: 20 }}>

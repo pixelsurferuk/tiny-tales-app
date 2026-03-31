@@ -193,7 +193,7 @@ export default function ProfilesScreen() {
                                     </View>
                                 </Pressable>
 
-                                {/* Thoughts + Chat + Tips */}
+                                {/* Thoughts + Chat */}
                                 <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
                                     <Pressable style={tabBtn(false)} onPress={() => onGetThought(pet)}>
                                         <Ionicons name="bulb-outline" size={15} color={t.colors.textOverPrimary} />
@@ -203,9 +203,17 @@ export default function ProfilesScreen() {
                                         <Ionicons name="chatbubble-outline" size={15} color={t.colors.textOverPrimary} />
                                         <Text style={tabBtnText(false)}>Chat</Text>
                                     </Pressable>
-                                    <Pressable style={tabBtn(false)} onPress={() => router.push({ pathname: "/profiles/tips", params: { petId: pet.id } })}>
+                                </View>
+
+                                {/* Training Tips + Brain Games */}
+                                <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
+                                    <Pressable style={tabBtn(false)} onPress={() => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "training" } })}>
                                         <Ionicons name="ribbon-outline" size={15} color={t.colors.textOverPrimary} />
-                                        <Text style={tabBtnText(false)}>Tips</Text>
+                                        <Text style={tabBtnText(false)}>Training Tips</Text>
+                                    </Pressable>
+                                    <Pressable style={tabBtn(false)} onPress={() => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "activity" } })}>
+                                        <Ionicons name="bulb-outline" size={15} color={t.colors.textOverPrimary} />
+                                        <Text style={tabBtnText(false)}>Brain Games</Text>
                                     </Pressable>
                                 </View>
 
