@@ -25,34 +25,39 @@ function requiresPhoto(pet, action, alert) {
 }
 
 // Clean 4-icon action grid
-function PetActionGrid({ pet, onThought, onChat, t, g }) {
-    const actions = [
-        { key: "challenges",   icon: "trophy-outline", label: "Challenges", onPress: () => router.push({ pathname: "/challenge", params: { petId: pet.id } }) },
-        { key: "tips",    icon: "ribbon-outline",      label: "Training",   onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "training" } }) },
-        { key: "games",   icon: "extension-puzzle-outline", label: "Games", onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "activity" } }) },
-        { key: "thought", icon: "bulb-outline",       label: "Thoughts",   onPress: () => onThought(pet) },
-        { key: "chat",    icon: "chatbubble-outline",  label: "Chat",       onPress: () => onChat(pet) },
+function PetActionGrid({ pet, onThought, onChat, t, g, actions: customActions }) {
+    const defaultActions = [
+        { key: "challenges", icon: "trophy-outline",           label: "Challenges", bg: t.colors.primary,    text: t.colors.textOverPrimary,    onPress: () => router.push({ pathname: "/challenge", params: { petId: pet.id } }) },
+        { key: "tips",       icon: "ribbon-outline",           label: "Training",   bg: t.colors.secondary,  text: t.colors.textOverSecondary,  onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "training" } }) },
+        { key: "games",      icon: "extension-puzzle-outline", label: "Games",      bg: t.colors.success,    text: t.colors.textOverSuccess,    onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "activity" } }) },
+        { key: "thought",    icon: "bulb-outline",             label: "Thoughts",   bg: t.colors.third,      text: t.colors.textOverThird,      onPress: () => onThought(pet) },
+        { key: "chat",       icon: "chatbubble-outline",       label: "Chat",       bg: t.colors.accent,     text: t.colors.textOverPrimary,    onPress: () => onChat(pet) },
     ];
+
+    const actions = customActions ?? defaultActions;
 
     return (
         <View style={{ flexDirection: "row", gap: 4, marginTop: 10 }}>
-            {actions.map((action) => (
-                <Pressable
-                    key={action.key}
-                    onPress={action.onPress}
-                    style={{
-                        flex: 1, alignItems: "center", justifyContent: "center",
-                        gap: 2, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6,
-                        backgroundColor: t.colors.primary,
-                       borderColor: t.colors.text + "18",
-                    }}
-                >
-                    <Ionicons name={action.icon} size={20} color={t.colors.textOverPrimary} />
-                    <Text style={{ fontSize: 10, fontWeight: "600", color: t.colors.textOverPrimary, textAlign: "center" }} numberOfLines={2}>
-                        {action.label}
-                    </Text>
-                </Pressable>
-            ))}
+            {actions.map((action) => {
+                const bg   = action.bg   ?? t.colors.primary;
+                const text = action.text ?? t.colors.textOverPrimary;
+                return (
+                    <Pressable
+                        key={action.key}
+                        onPress={action.onPress}
+                        style={{
+                            flex: 1, alignItems: "center", justifyContent: "center",
+                            gap: 2, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6,
+                            backgroundColor: bg,
+                        }}
+                    >
+                        <Ionicons name={action.icon} size={20} color={text} />
+                        <Text style={{ fontSize: 10, fontWeight: "600", color: text, textAlign: "center" }} numberOfLines={2}>
+                            {action.label}
+                        </Text>
+                    </Pressable>
+                );
+            })}
         </View>
     );
 }
