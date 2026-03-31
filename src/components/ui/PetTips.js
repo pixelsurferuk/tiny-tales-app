@@ -1,5 +1,5 @@
 // src/components/ui/PetTips.js
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -168,11 +168,14 @@ export default function PetTips({ pet, onBeforeGenerate, initialTab }) {
         }
     }, [activeTab, loadPoolAndSeen]);
 
-    // Auto-open initial tab when navigated to with a pre-selected tab
+    // Auto-open initial tab once pet data is available
+    const didAutoOpen = useRef(false);
     useEffect(() => {
-        if (initialTab) handleTabPress(initialTab);
+        if (!initialTab || !pet?.id || didAutoOpen.current) return;
+        didAutoOpen.current = true;
+        handleTabPress(initialTab);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [pet?.id]);
 
     // Get Tip / Next Tip — this is where credit is spent
     const handleGetTip = useCallback(() => {
