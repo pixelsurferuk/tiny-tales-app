@@ -28,23 +28,22 @@ function requiresPhoto(pet, action, alert) {
 function PetActionGrid({ pet, onThought, onChat, t, g }) {
     const actions = [
         { key: "challenges",   icon: "trophy-outline", label: "Challenges", onPress: () => router.push({ pathname: "/challenge", params: { petId: pet.id } }) },
+        /*{ key: "games",   icon: "extension-puzzle-outline", label: "Games", onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "activity" } }) },*/
         { key: "tips",    icon: "ribbon-outline",      label: "Training",   onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "training" } }) },
-        { key: "games",   icon: "extension-puzzle-outline", label: "Games", onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "activity" } }) },
         { key: "thought", icon: "bulb-outline",       label: "Thoughts",   onPress: () => onThought(pet) },
         { key: "chat",    icon: "chatbubble-outline",  label: "Chat",       onPress: () => onChat(pet) },
     ];
 
     return (
-        <View style={{ flexDirection: "row", gap: 4, marginTop: 10 }}>
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
             {actions.map((action) => (
                 <Pressable
                     key={action.key}
                     onPress={action.onPress}
                     style={{
                         flex: 1, alignItems: "center", justifyContent: "center",
-                        gap: 2, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6,
-                        backgroundColor: t.colors.primary,
-                       borderColor: t.colors.text + "18",
+                        gap: 2, paddingVertical: 6, paddingHorizontal: 4, borderRadius: 8,
+                        backgroundColor: t.colors.primary
                     }}
                 >
                     <Ionicons name={action.icon} size={20} color={t.colors.textOverPrimary} />
@@ -221,7 +220,7 @@ export default function ProfilesScreen() {
                             <View key={pet.id} style={styles.card}>
 
                                 {/* Pet header row */}
-                                <Pressable onPress={() => onPickActive(pet.id)} style={[g.row, { gap: 12 }]} hitSlop={10}>
+                                <Pressable onPress={() => onPickActive(pet.id)} style={[g.row, { gap: 12, alignItems: "center" }]} hitSlop={10}>
                                     <View style={styles.avatarWrap}>
                                         {pet.avatarUri ? (
                                             <Image source={{ uri: pet.avatarUri }} style={styles.avatar} />
@@ -242,22 +241,13 @@ export default function ProfilesScreen() {
                                     <View style={styles.actions}>
                                         <Pressable
                                             onPress={() => router.push({ pathname: "/profiles/edit", params: { id: pet.id } })}
-                                            style={[styles.actionBtnBase, styles.actionBtnEdit]}
+                                            style={styles.actionBtnBase}
                                             hitSlop={10}
                                         >
-                                            <Ionicons name="settings-outline" size={18} color={t.colors.textOverSuccess ?? t.colors.text} />
+                                            <Ionicons name="settings-outline" size={18} color={t.colors.text} />
                                         </Pressable>
                                     </View>
                                 </Pressable>
-
-                                {/* 4-icon action grid */}
-                                <PetActionGrid
-                                    pet={pet}
-                                    onThought={onGetThought}
-                                    onChat={onChat}
-                                    t={t}
-                                    g={g}
-                                />
 
                                 {/* Challenge streak row */}
                                 {cd ? (
@@ -265,9 +255,8 @@ export default function ProfilesScreen() {
                                         onPress={() => router.push({ pathname: "/challenge", params: { petId: pet.id } })}
                                         style={{
                                             flexDirection: "row", alignItems: "center",
-                                            gap: 10, marginTop: 8, paddingVertical: 8,
-                                            paddingHorizontal: 10, borderRadius: 6,
-                                           backgroundColor: t.colors.bg,
+                                            gap: 10, marginTop: 10,
+
                                         }}
                                     >
                                         <View style={{ flex: 1 }}>
@@ -287,6 +276,15 @@ export default function ProfilesScreen() {
                                         )}
                                     </Pressable>
                                 ) : null}
+
+                                {/* 5-icon action grid */}
+                                <PetActionGrid
+                                    pet={pet}
+                                    onThought={onGetThought}
+                                    onChat={onChat}
+                                    t={t}
+                                    g={g}
+                                />
 
                             </View>
                         );

@@ -352,8 +352,8 @@ export const makeProfilesStyles = (t) =>
         },
         cardSelected: { borderColor: t.colors.primary, borderWidth: 2 },
 
-        avatarWrap: { width: 70, height: 90 },
-        avatar: { width: 70, height: 90, borderRadius: 12, backgroundColor: "rgba(0,0,0,0.06)" },
+        avatarWrap: { width: 60, height: 60 },
+        avatar: { width: 60, height: 60, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.06)" },
         avatarFallback: { alignItems: "center", justifyContent: "center" },
         avatarFallbackText: { fontSize: 20, color: "rgba(0,0,0,0.35)" },
 
@@ -362,12 +362,9 @@ export const makeProfilesStyles = (t) =>
 
         actions: { alignItems: "flex-end", gap: 8 },
 
-        actionBtnBase: { paddingVertical: 10, paddingHorizontal: 15, borderRadius: 10 },
-        actionBtnLabel: { fontSize: 12, textAlign: "center", width: 65, fontFamily: t.fontFamily.title },
-        actionBtnEdit: { backgroundColor: t.colors.success, fontFamily: t.fontFamily.title },
-        actionBtnEditText: { color: t.colors.textOverSuccess, fontFamily: t.fontFamily.title },
-        actionBtnDelete: { backgroundColor: t.colors.danger, fontFamily: t.fontFamily.title },
-        actionBtnDeleteText: { color: t.colors.textOverDanger, fontFamily: t.fontFamily.title },
+        actionBtnBase: {width: 45, height:45, borderRadius: 999,  borderWidth: 1, display: "flex", alignItems: "center", justifyContent: "center",
+            borderColor: t.colors.border,
+            backgroundColor: t.colors.cardBG, },
 
         actionSpacing: { marginTop: 10 },
     });
