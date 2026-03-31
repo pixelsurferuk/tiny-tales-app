@@ -173,8 +173,7 @@ export default function PetChallengeClub() {
                     <Pressable onPress={() => router.back()} style={g.screenHeaderBtn}>
                         <Text style={g.screenHeaderBtnText}>Back</Text>
                     </Pressable>
-                    <Text style={g.screenHeaderTitle}>Challenge Club</Text>
-                    <View style={{ width: 60 }} />
+                    <Text style={[g.screenHeaderTitle, {flexShrink: 1}]}>Pet Challenges</Text>
                 </View>
                 <View style={[g.center, { padding: 24 }]}>
                     <Text style={[g.subTitle, { textAlign: "center", marginBottom: 8 }]}>No pet profile yet</Text>
@@ -195,8 +194,7 @@ export default function PetChallengeClub() {
                 <Pressable onPress={() => router.back()} style={g.screenHeaderBtn}>
                     <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
-                <Text style={g.screenHeaderTitle}>Pet Challenges</Text>
-                <View style={{ width: 60 }} />
+                <Text style={[g.screenHeaderTitle, {flexShrink: 1}]}>Pet Challenges</Text>
             </View>
 
             <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>

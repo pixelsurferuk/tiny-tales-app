@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { ScrollView } from "react-native";
+import {Pressable, ScrollView, Text, View} from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
@@ -8,7 +8,7 @@ import PetHeader from "../../src/components/ui/PetHeader";
 import AuthCreditsBar from "../../src/components/auth/AuthCreditsBar";
 import PetTips from "../../src/components/ui/PetTips";
 import { AppBannerAd } from "../../src/ads/admob";
-import { useTTTheme } from "../../src/theme/globalStyles";
+import { useTTTheme, useGlobalStyles } from "../../src/theme/globalStyles";
 import { useEntitlements } from "../../src/state/entitlements";
 import { useTTAlert } from "../../src/components/ui/TTAlert";
 import { useAdGate } from "../../src/ads/useAdGate";
@@ -18,8 +18,8 @@ export default function PetTipsScreen() {
     const params = useLocalSearchParams();
     const petIdParam = typeof params?.petId === "string" ? params.petId : null;
     const tabParam = typeof params?.tab === "string" ? params.tab : null;
-
     const t = useTTTheme();
+    const g = useGlobalStyles(t);
     const { isPro, server, refreshAll } = useEntitlements();
     const alert = useTTAlert();
 
@@ -82,12 +82,15 @@ export default function PetTipsScreen() {
 
                 <AppBannerAd enabled={!isPro} refreshKey={`tips-${pet?.id}`} />
 
-                <PetHeader
-                    petName={pet?.name}
-                    avatarUri={pet?.avatarUri}
-                    onBack={() => router.back()}
-                    disabled={isWatchingAd}
-                />
+
+                <View style={g.screenHeader}>
+                    <Pressable onPress={() => router.back()} style={g.screenHeaderBtn}>
+                        <Text style={g.screenHeaderBtnText}>Back</Text>
+                    </Pressable>
+                    <Text style={[g.screenHeaderTitle, {flexShrink: 1}]} numberOfLines={2}>{pet?.name}'s Training Area</Text>
+                </View>
+
+
 
                 <AuthCreditsBar compact />
 

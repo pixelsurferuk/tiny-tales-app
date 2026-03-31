@@ -163,6 +163,7 @@ export function useGlobalStyles(t) {
             borderBottomWidth: 1,
             borderColor: t.colors.border,
             backgroundColor: t.colors.cardBG,
+            gap: 15,
         },
         screenHeaderBtn: { paddingVertical: 10, paddingHorizontal: 10 },
         screenHeaderBtnText: { color: t.colors.text, fontFamily: t.fontFamily.title },

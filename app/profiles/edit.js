@@ -276,8 +276,7 @@ export default function EditPetScreen() {
                 <Pressable onPress={() => router.back()} style={g.screenHeaderBtn}>
                     <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
-                <Text style={g.screenHeaderTitle}>{title}</Text>
-                <View style={{ width: 60 }} />
+                <Text style={[g.screenHeaderTitle, {flexShrink: 1}]}>{title}</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
