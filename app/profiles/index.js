@@ -269,7 +269,7 @@ export default function ProfilesScreen() {
                                                     : "Start a challenge streak!"}
                                             </Text>
                                             {/*<Text style={[g.text, { fontSize: 11, opacity: 0.6 }]}>
-                                                {isPro ? "Pro" : cd.daysLeft > 0 ? `${cd.daysLeft} free days left` : "Trial ended — Go Pro"}
+                                                {isPro ? "Pro" : cd.daysLeft > 0 ? `${cd.daysLeft} free days left` : "Trial ended — Subscribe"}
                                             </Text>*/}
                                         </View>
                                         {cd.todayDone ? (

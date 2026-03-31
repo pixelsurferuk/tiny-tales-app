@@ -60,7 +60,7 @@ export default function HomeScreen() {
                             <Text style={[g.text, styles.badgeText]}>Tiny Tales</Text>
                         </View>
                         <View>
-                            <Text style={g.title}>Your pet's world.</Text>
+                          {/*  <Text style={g.title}>Your pet's world.</Text>*/}
                             <Text style={g.text}>Build a deeper bond through challenges or explore training tips and brain-boosting games for happier, smarter pets.      </Text>
                         </View>
                         {/*<TTButton title="Get A Quick Pet Thought" onPress={() => router.push("/camera")} />*/}
@@ -98,11 +98,13 @@ export default function HomeScreen() {
 
                     <ChallengeClubCard petCount={petCount} refreshKey={loginKey} />
 
-                    <AuthCreditsBar />
+
 
                     </View>
 
                 </ScrollView>
+
+                <AuthCreditsBar />
 
             </Screen>
         </>

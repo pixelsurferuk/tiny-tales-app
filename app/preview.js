@@ -304,14 +304,14 @@ export default function Preview() {
                                 />
                             </View>
 
-                            {(thinking || isWatchingAd) && (
+                            {/*{(thinking || isWatchingAd) && (
                                 <View style={styles.busyRow}>
                                     <ActivityIndicator style={{ marginRight: 8 }} />
                                     <Text style={styles.busyText}>
                                         {isWatchingAd ? "Loading ad…" : "Thinking…"}
                                     </Text>
                                 </View>
-                            )}
+                            )}*/}
                         </View>
 
                         {showCaption && <ShareCaptionBar />}
@@ -332,7 +332,7 @@ export default function Preview() {
                             onPress={onShare}
                             disabled={disableButtons}
                             style={{ flex: 1 }}
-                            leftIcon={<Ionicons name="share-social-outline" size={18} color={t.colors.textOverPrimary} />}
+                            leftIcon={<Ionicons name="share-social-outline" size={18} color={t.colors.textOverSecondary} />}
                         />
 
                         {!fromProfiles && (
@@ -342,7 +342,7 @@ export default function Preview() {
                                 onPress={() => router.back()}
                                 disabled={disableButtons}
                                 style={{ flex: 1 }}
-                                leftIcon={<Ionicons name="camera-outline" size={18} color={t.colors.textOverPrimary} />}
+                                leftIcon={<Ionicons name="camera-outline" size={18} color={t.colors.textOverThird} />}
                             />
                         )}
                     </View>

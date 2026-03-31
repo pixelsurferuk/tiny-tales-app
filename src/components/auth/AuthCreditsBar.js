@@ -72,10 +72,10 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
                 borderBottomColor: t.colors.text + "22",
                 ...(homePage && {marginBottom: 0}),
             }, style]}>
-                <Text style={[g.text, { fontSize: 12, opacity: 0.7 }]}>
+                <Text style={[g.text, { fontSize: 13 }]}>
                     {isLoggedIn && email ? email : "Guest"}
                 </Text>
-                <Text style={[g.text, { fontSize: 12, opacity: 0.7 }]}>
+                <Text style={[g.text, { fontSize: 13 }]}>
                     Credits: {isPro ? "Unlimited" : effectiveCredits}
                 </Text>
             </View>
@@ -94,9 +94,18 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
     return (
         <>
             {showBar && (
-                <View style={[styles.card, styles.wrap, style]}>
+                <View style={[{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingHorizontal: 15,
+                    paddingVertical: 10,
+                    gap: 20,
+                    backgroundColor: t.colors.cardBG,
+                    borderTopWidth: 0.5,
+                    borderTopColor: t.colors.text + "22",
+                }, style]}>
 
-                    <Text style={[g.subTitle, { fontSize: 20, marginBottom: 15, textAlign: "center" }]}>
+                    <Text style={[g.text, {flexShrink: 1}]} numberOfLines={2}>
                         Watch 5 video ads and get 10 free credits daily.
                     </Text>
 
@@ -105,18 +114,9 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
                             variant="third"
                             title={isPro ? "Manage Subscription" : "Get Credits"}
                             onPress={() => router.push("/paywall")}
+                            style={{ flexShrink: 0 }} // 👈 button keeps its size
                         />
                     )}
-
-                    {/*{isLoggedIn && (
-                        <TTButton
-                            variant="danger"
-                            title={busy ? "Signing out…" : "Sign Out"}
-                            onPress={handleLogout}
-                            disabled={busy}
-                            style={{ marginTop: 10 }}
-                        />
-                    )}*/}
 
                 </View>
             )}

@@ -212,7 +212,7 @@ export default function PetChallengeClub() {
                         <Ionicons name="lock-closed-outline" size={20} color={t.colors.text} />
                         <View style={{ flex: 1 }}>
                             <Text style={[g.subTitle, { fontSize: 13, marginBottom: 0 }]}>
-                                Challenge Club is Pro only
+                                Challenges is Pro only
                             </Text>
                             <Text style={[g.text, { fontSize: 12, opacity: 0.7 }]}>
                                 Subscribe to keep your streak alive and unlock daily challenges
@@ -222,7 +222,7 @@ export default function PetChallengeClub() {
                             onPress={() => router.push("/paywall")}
                             style={{ backgroundColor: t.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
                         >
-                            <Text style={{ color: t.colors.textOverPrimary, fontWeight: "700", fontSize: 12 }}>Go Pro</Text>
+                            <Text style={{ color: t.colors.textOverPrimary, fontWeight: "700", fontSize: 12 }}>Subscribe</Text>
                         </Pressable>
                     </View>
                 ) : !isPro && inTrial ? (
@@ -270,7 +270,7 @@ export default function PetChallengeClub() {
                             </Text>
                         </View>
                         {activePet.avatarUri ? (
-                            <Image source={{ uri: activePet.avatarUri }} style={{ width: 55, height: 55, borderRadius: 999 }} />
+                            <Image source={{ uri: activePet.avatarUri }} style={{ width: 80, height: 80, borderRadius: 999, marginLeft: 20 }} />
                         ) : null}
                     </View>
 
