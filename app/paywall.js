@@ -12,7 +12,7 @@ import { useTTTheme, useGlobalStyles, makePaywallStyles } from "../src/theme/glo
 import { useEntitlements } from "../src/state/entitlements";
 import { useAuth } from "../src/state/auth";
 import InlineLoginGate from "../src/components/auth/InlineLoginGate";
-import { CREDIT_PRODUCTS, SUBSCRIPTIONS_ENABLED, REWARDED_ADS_ENABLED } from "../src/config";
+import { CREDIT_PRODUCTS, SUBSCRIPTIONS_ENABLED } from "../src/config";
 import { useTTAlert } from "../src/components/ui/TTAlert";
 
 
@@ -43,7 +43,7 @@ export default function Paywall() {
     const copy = getSourceCopy(source);
 
     const { server, isPro, refreshAll, rcReady, setCreditsLocal } = useEntitlements();
-    const { email, userId, isLoggedIn, ready: authReady } = useAuth();
+    const { email, isLoggedIn, ready: authReady } = useAuth();
 
     const [loadingProducts, setLoadingProducts] = useState(false);
     const [loadingOffer, setLoadingOffer] = useState(false);

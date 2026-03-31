@@ -9,14 +9,6 @@ function makeReqId() {
     return `${Date.now().toString(36)}_${Math.random().toString(16).slice(2, 8)}`;
 }
 
-function miniFingerprint(str) {
-    const s = String(str || "");
-    if (!s) return "0";
-    const a = s.slice(0, 24);
-    const b = s.slice(-24);
-    return `${s.length}:${a}:${b}`;
-}
-
 async function buildHeaders(extra = {}) {
     const token = await getAccessToken().catch(() => null);
     return {
@@ -39,7 +31,7 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
         if (text) {
             try {
                 json = JSON.parse(text);
-            } catch (e) {
+            } catch {
                 const err = new Error(`Invalid JSON from ${url}`);
                 err.code = "BAD_JSON";
                 err.status = res.status;

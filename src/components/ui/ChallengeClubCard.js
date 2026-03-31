@@ -71,7 +71,6 @@ export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
     }, [refreshKey, load]);
 
     const allDone = petSummaries.length > 0 && petSummaries.every(s => s.todayDone);
-    const anyAvailable = petSummaries.some(s => !s.todayDone);
     const inTrial = minDaysLeft > 0;
     const trialOver = !isPro && !inTrial && petSummaries.length > 0;
 

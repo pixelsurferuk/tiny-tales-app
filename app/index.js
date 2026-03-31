@@ -98,8 +98,6 @@ export default function HomeScreen() {
 
                     <ChallengeClubCard petCount={petCount} refreshKey={loginKey} />
 
-
-
                     </View>
 
                 </ScrollView>

@@ -257,22 +257,6 @@ export default function Ask() {
     const [isExporting, setIsExporting] = useState(false);
     const [showCaption, setShowCaption] = useState(false);
 
-    // ─── Height restore on keyboard hide ─────────────────────────────────────
-    const [setContainerHeight] = useState(null);
-    const originalHeightRef = useRef(null);
-
-    useEffect(() => {
-        const hide = Keyboard.addListener("keyboardDidHide", () => {
-            if (originalHeightRef.current) {
-                setContainerHeight(originalHeightRef.current);
-            }
-        });
-        const show = Keyboard.addListener("keyboardDidShow", () => {
-            setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-        });
-        return () => { hide.remove(); show.remove(); };
-    }, []);
-
     const uriParam = typeof params?.uri === "string" ? params.uri : null;
     const petIdParam = typeof params?.petId === "string" ? params.petId : null;
 
@@ -301,7 +285,7 @@ export default function Ask() {
         onLimitReached: openPaywall,
     });
 
-    const { messages, isTyping, sendMessage, serverOnline } = usePetChat(activePet, displayUri, {
+    const { messages, isTyping, sendMessage } = usePetChat(activePet, displayUri, {
         deviceId,
         isPro,
         onPaywall: () => {
