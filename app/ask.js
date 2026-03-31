@@ -441,11 +441,11 @@ export default function Ask() {
 
                                 <Pressable style={styles.dismissLayer} onPress={Keyboard.dismiss} />
 
-                                {!serverOnline && (
+                                {/*{!serverOnline && (
                                     <View style={styles.offlineRow}>
                                         <Text style={styles.offlineText}>Offline Mode</Text>
                                     </View>
-                                )}
+                                )}*/}
 
                                 <View style={styles.chatOverlay}>
                                     <View style={styles.chatPanel}>

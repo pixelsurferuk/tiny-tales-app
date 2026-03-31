@@ -48,7 +48,7 @@ export default function TTButton({
             ) : (
                 <>
                     {leftIcon}
-                    <Text style={[s.textStyle, vText, textStyle]} numberOfLines={1}>{title}</Text>
+                    <Text style={[s.textStyle, vText, textStyle, {fontSize: 16}]} numberOfLines={1}>{title}</Text>
                     {rightIcon}
                 </>
             )}

@@ -20,6 +20,7 @@ export default function HomeScreen() {
     const g = useGlobalStyles(t);
     const styles = useMemo(() => makeHomeStyles(t), [t]);
     const [petCount, setPetCount] = useState(0);
+    const [loginKey, setLoginKey] = useState(0);
     const { refreshAll } = useEntitlements();
     const { isLoggedIn } = useAuth();
 
@@ -56,49 +57,49 @@ export default function HomeScreen() {
 
                     <View style={[styles.card, styles.heroCard]}>
                         <View style={styles.badge}>
-                            <Text style={[g.text, styles.badgeText]}>Smart Tails</Text>
+                            <Text style={[g.text, styles.badgeText]}>Tiny Tales</Text>
                         </View>
                         <View>
-                            <Text style={g.title}>Your pet's world, in their own words.</Text>
-                            <Text style={g.text}>
-                                Uncover your pet’s secret thoughts, chat with their personality, build a deeper bond through challenges or explore training tips and brain-boosting games for happier, smarter pets.      </Text>
+                            <Text style={g.title}>Your pet's world.</Text>
+                            <Text style={g.text}>Build a deeper bond through challenges or explore training tips and brain-boosting games for happier, smarter pets.      </Text>
                         </View>
                         {/*<TTButton title="Get A Quick Pet Thought" onPress={() => router.push("/camera")} />*/}
+                        <View style={styles.featureRow}>
+                            <FeaturePill icon="chatbubbles-outline" label="Chat to Pets"  />
+                            <FeaturePill icon="camera-outline" label="Get pet Thoughts"/>
+                            <FeaturePill icon="ribbon-outline" label="Training Tips"  />
+                            <FeaturePill icon="bulb-outline" label="Brain Games" />
+                            <FeaturePill icon="trophy-outline" label="Pet Challenges" />
+                            <FeaturePill icon="heart-outline" label="Profiles"  />
+                        </View>
                         {!isLoggedIn && (
                             <LoginGateButton
                                 title="Sign in"
-                                variant="success"
+                                variant="primary"
                                 gateTitle="Sign in to Tiny Tales"
                                 gateSubtitle="Keep your credits and pets saved across devices."
-                                onSuccess={() => refreshAll({ reason: "index_login" })}
+                                onSuccess={() => {
+                                refreshAll({ reason: "index_login" });
+                                refreshPets();
+                                setLoginKey(k => k + 1);
+                            }}
                             />
+                        )}
+                        {isLoggedIn && (
+                            <View style={{marginTop: 10}}>
+                                <TTButton
+                                    title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
+                                    variant="primary"
+                                    onPress={() => router.push(petCount > 0 ? "/profiles" : "/profiles/edit")}
+                                />
+                            </View>
                         )}
                     </View>
 
-                    <ChallengeClubCard petCount={petCount} />
-
-                    <View style={styles.card}>
-                        <View style={styles.buttons}>
-                            <View>
-                                <Text style={g.title}>Pet Profiles</Text>
-                            </View>
-                            <View style={styles.featureRow}>
-                                {/*<FeaturePill icon="heart-outline" label="Profiles" onPress={() => router.push("/profiles")} />*/}
-                                <FeaturePill icon="chatbubbles-outline" label="Chat to pets" onPress={() => router.push("/profiles")} />
-                                <FeaturePill icon="camera-outline" label="Get pet Thoughts" onPress={() => router.push("/profiles")} />
-                                <FeaturePill icon="ribbon-outline" label="Training Tips" onPress={() => router.push("/profiles")} />
-                                <FeaturePill icon="bulb-outline" label="Brain Games" onPress={() => router.push("/profiles")} />
-                                {/*<FeaturePill icon="star-outline" label="Owner Rating" onPress={() => router.push("/profiles")} />*/}
-                            </View>
-                            <TTButton
-                                title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
-                                variant="secondary"
-                                onPress={() => router.push(petCount > 0 ? "/profiles" : "/profiles/edit")}
-                            />
-                        </View>
-                    </View>
+                    <ChallengeClubCard petCount={petCount} refreshKey={loginKey} />
 
                     <AuthCreditsBar />
+
                     </View>
 
                 </ScrollView>
@@ -115,9 +116,9 @@ function FeaturePill({ icon, label, onPress }) {
     return (
         <Pressable
             onPress={onPress}
-            style={({ pressed }) => [styles.featurePill, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+            style={[styles.featurePill]}
         >
-            <Ionicons name={icon} size={15} color={t.colors.primary} />
+            <Ionicons name={icon} size={20} color={t.colors.primary} />
             <Text style={[g.text, styles.featurePillText]}>{label}</Text>
         </Pressable>
     );

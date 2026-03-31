@@ -102,7 +102,7 @@ export default function WatchAdButton({ disabled = false, compact = false, style
         <View style={[styles.freeCard, style]}>
             <View style={styles.freeCardLeft}>
                 <View style={styles.freeIconWrap}>
-                    <Ionicons name="play-circle" size={20} color={t.colors.textOverPrimary} />
+                    <Ionicons name="play-circle" size={20} color={t.colors.textOverThird} />
                 </View>
                 <View style={g.flex}>
                     <Text style={styles.freeTitle}>Get 3 free credits</Text>

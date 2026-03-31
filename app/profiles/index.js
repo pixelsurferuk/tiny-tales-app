@@ -14,7 +14,7 @@ import { useAdGate } from "../../src/ads/useAdGate";
 import PetTips from "../../src/components/ui/PetTips";
 import AuthCreditsBar from "../../src/components/auth/AuthCreditsBar";
 import { debouncedPushSync } from "../../src/services/syncService";
-import { getLocalStreak, getTodayChallenge, getGlobalDaysLeft } from "../../src/services/challengeService";
+import { getLocalStreak, getTodayChallenge, getGlobalDaysLeft, getBadgeTier } from "../../src/services/challengeService";
 
 function requiresPhoto(pet, action, alert) {
     if (!pet.avatarUri) {
@@ -154,14 +154,14 @@ export default function ProfilesScreen() {
 
     const tabBtn = (active) => ({
         flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-        gap: 6, paddingVertical: 9, borderRadius: 10,
-        backgroundColor: active ? t.colors.primary : t.colors.cardBG,
-        borderWidth: 1, borderColor: active ? t.colors.primary : t.colors.text + "18",
+        gap: 6, paddingVertical: 9, borderRadius: 8,
+        backgroundColor: t.colors.primary,
     });
+
 
     const tabBtnText = (active) => ({
         fontSize: 13, fontWeight: "600",
-        color: active ? t.colors.textOverPrimary : t.colors.text,
+        color: t.colors.textOverPrimary,
     });
 
     return (
@@ -233,14 +233,22 @@ export default function ProfilesScreen() {
                                 {/* Thoughts + Chat */}
                                 <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
                                     <Pressable style={tabBtn(false)} onPress={() => onGetThought(pet)}>
-                                        <Ionicons name="bulb-outline" size={15} color={t.colors.text} />
-                                        <Text style={tabBtnText(false)}>Thoughts</Text>
+                                        <Ionicons name="bulb-outline" size={15} color={t.colors.textOverPrimary} />
+                                        <Text style={tabBtnText(false)}>Pet thoughts</Text>
                                     </Pressable>
                                     <Pressable style={tabBtn(false)} onPress={() => onChat(pet)}>
-                                        <Ionicons name="chatbubble-outline" size={15} color={t.colors.text} />
-                                        <Text style={tabBtnText(false)}>Chat</Text>
+                                        <Ionicons name="chatbubble-outline" size={15} color={t.colors.textOverPrimary} />
+                                        <Text style={tabBtnText(false)}>Chat to pet</Text>
                                     </Pressable>
                                 </View>
+
+
+
+                                {/* PetTips always visible */}
+                                <PetTips
+                                    pet={summarizePetForPrompt(pet)}
+                                    onBeforeGenerate={(tab, onConfirmed, onCancel) => handleBeforeGenerate(pet, tab, onConfirmed, onCancel)}
+                                />
 
                                 {/* Challenge streak row */}
                                 {cd ? (
@@ -250,39 +258,33 @@ export default function ProfilesScreen() {
                                             flexDirection: "row", alignItems: "center",
                                             gap: 10, marginTop: 8, paddingVertical: 8,
                                             paddingHorizontal: 10, borderRadius: 10,
-                                            backgroundColor: t.colors.bg,
                                             borderWidth: 1, borderColor: t.colors.text + "18",
                                         }}
                                     >
-                                        <Text style={{ fontSize: 16 }}>🏆</Text>
+                                       {/* <Text style={{ fontSize: 16 }}>🏆</Text>*/}
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[g.text, { fontSize: 13, fontWeight: "600" }]}>
+                                            <Text style={[g.text, { fontSize: 16, fontWeight: "600" }]}>
                                                 {cd.streak > 0
-                                                    ? `${cd.streak >= 30 ? "🥇" : cd.streak >= 14 ? "🥈" : cd.streak >= 7 ? "🥉" : "🐾"} ${cd.streak} day streak`
+                                                    ? `${getBadgeTier(cd.streak)?.emoji ?? ""} ${cd.streak} Day Streak!`
                                                     : "Start a challenge streak!"}
                                             </Text>
-                                            <Text style={[g.text, { fontSize: 11, opacity: 0.6 }]}>
+                                            {/*<Text style={[g.text, { fontSize: 11, opacity: 0.6 }]}>
                                                 {isPro ? "Pro" : cd.daysLeft > 0 ? `${cd.daysLeft} free days left` : "Trial ended — Go Pro"}
-                                            </Text>
+                                            </Text>*/}
                                         </View>
                                         {cd.todayDone ? (
-                                            <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                                            <Ionicons name="checkmark-circle" size={22} color="#22c55e" />
                                         ) : (
                                             <View style={{
                                                 backgroundColor: t.colors.primary, borderRadius: 6,
-                                                paddingHorizontal: 8, paddingVertical: 3,
+                                                paddingHorizontal: 14, paddingVertical: 7,
                                             }}>
-                                                <Text style={{ color: t.colors.textOverPrimary, fontSize: 11, fontWeight: "700" }}>GO</Text>
+                                                <Text style={{ color: t.colors.textOverPrimary, fontSize: 13, fontWeight: "700" }}>Go</Text>
                                             </View>
                                         )}
                                     </Pressable>
                                 ) : null}
 
-                                {/* PetTips always visible */}
-                                <PetTips
-                                    pet={summarizePetForPrompt(pet)}
-                                    onBeforeGenerate={(tab, onConfirmed, onCancel) => handleBeforeGenerate(pet, tab, onConfirmed, onCancel)}
-                                />
                             </View>
                         );
                     })}

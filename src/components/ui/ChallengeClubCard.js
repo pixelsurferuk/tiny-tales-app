@@ -1,5 +1,5 @@
 // src/components/ui/ChallengeClubCard.js
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,11 +17,12 @@ import { useTTTheme, useGlobalStyles } from "../../theme/globalStyles";
 import { useEntitlements } from "../../state/entitlements";
 import { getPets } from "../../services/pets";
 import {
-    getLocalStreak, getLocalBadges, getTodayChallenge,
+    getLocalStreak, getTodayChallenge,
     getGlobalDaysLeft,
 } from "../../services/challengeService";
+import TTButton from "./TTButton";
 
-export default function ChallengeClubCard({ petCount = 0 }) {
+export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
     const t = useTTTheme();
     const g = useGlobalStyles(t);
     const { isPro, server } = useEntitlements();
@@ -35,10 +36,6 @@ export default function ChallengeClubCard({ petCount = 0 }) {
             const pets = await getPets();
             if (!pets?.length) { setLoading(false); return; }
 
-            // Server date wins — prevents trial reset on login
-            const globalDays = getGlobalDaysLeft(server?.challengeTrialStartedAt || null);
-            setMinDaysLeft(globalDays);
-
             const summaries = await Promise.all(pets.map(async (pet) => {
                 const [streak, cached] = await Promise.all([
                     getLocalStreak(pet.id),
@@ -49,8 +46,15 @@ export default function ChallengeClubCard({ petCount = 0 }) {
                     name: pet.name,
                     streak: streak.count || 0,
                     todayDone: !!(cached?.completedAt),
+                    trialStartedAt: cached?.trialStartedAt || null,
                 };
             }));
+
+            // trialStartedAt comes from challenge data — same source of truth as challenge.js
+            const trialStartedAt = summaries.find(s => s.trialStartedAt)?.trialStartedAt
+                || server?.challengeTrialStartedAt
+                || null;
+            setMinDaysLeft(getGlobalDaysLeft(trialStartedAt));
 
             setPetSummaries(summaries);
         } catch {
@@ -61,6 +65,10 @@ export default function ChallengeClubCard({ petCount = 0 }) {
     }, [server?.challengeTrialStartedAt]);
 
     useFocusEffect(useCallback(() => { load(); }, [load]));
+
+    useEffect(() => {
+        if (refreshKey > 0) load();
+    }, [refreshKey, load]);
 
     const allDone = petSummaries.length > 0 && petSummaries.every(s => s.todayDone);
     const anyAvailable = petSummaries.some(s => !s.todayDone);
@@ -78,43 +86,43 @@ export default function ChallengeClubCard({ petCount = 0 }) {
             borderColor: border, padding: 16, gap: 12,
         }}>
             {/* Header */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 15, marginBottom: 10 }}>
                 <View style={{
-                    width: 40, height: 40, borderRadius: 20,
+                    width: 80, height: 80, borderRadius: 9999,
                     backgroundColor: t.colors.primary + "20",
                     alignItems: "center", justifyContent: "center",
                 }}>
-                    <Text style={{ fontSize: 20 }}>🏆</Text>
+                    <Text style={{ fontSize: 30 }}>🏆</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={[g.subTitle, { fontSize: 16 }]}>Pet Challenge Club</Text>
-                    <Text style={[g.text, { fontSize: 12, opacity: 0.6 }]}>
-                        Daily challenges to bond with your pet
+                    <Text style={g.subTitle}>Pet Challenges</Text>
+                    {/* Description */}
+                    <Text style={g.text}>
+                        {petCount === 0
+                            ? "Set up a pet profile to start daily challenges and build a streak together!"
+                            : trialOver
+                                ? "Your free trial has ended. Subscribe to keep your streaks alive"
+                                : allDone
+                                    ? "Great work today! All your pets' challenges are complete. Come back tomorrow"
+                                    : "Complete today's challenge with each pet to keep your streaks going."}
                     </Text>
                 </View>
-                {allDone && petSummaries.length > 0 ? (
-                    <View style={{
-                        backgroundColor: "#22c55e20", borderRadius: 8,
-                        paddingHorizontal: 8, paddingVertical: 4,
-                    }}>
-                        <Text style={{ color: "#22c55e", fontSize: 11, fontWeight: "700" }}>ALL DONE ✓</Text>
-                    </View>
-                ) : null}
+
             </View>
 
-            {/* Description */}
-            <Text style={[g.text, { lineHeight: 20, opacity: 0.8 }]}>
-                {petCount === 0
-                    ? "Set up a pet profile to start daily challenges and build a streak together!"
-                    : trialOver
-                        ? "Your free trial has ended. Subscribe to keep your streaks alive 🔥"
-                        : allDone
-                            ? "Great work today! All your pets' challenges are complete. Come back tomorrow 🐾"
-                            : "Complete today's challenge with each pet to keep your streaks going."}
-            </Text>
+            {allDone && petSummaries.length > 0 ? (
+                <View style={{
+                    backgroundColor: "#22c55e20", borderRadius: 8,
+                    paddingHorizontal: 10, paddingVertical: 8,
+                }}>
+                    <Text style={{ color: "#22c55e", fontSize: 12, fontWeight: "700" }}>ALL DONE ✓</Text>
+                </View>
+            ) : null}
+
+
 
             {/* Trial pill */}
-            {(!isPro && inTrial && petSummaries.length > 0) ? (
+           {/* {(!isPro && inTrial && petSummaries.length > 0) ? (
                 <View style={{
                     flexDirection: "row", alignItems: "center", gap: 6,
                     backgroundColor: t.colors.primary + "15",
@@ -126,7 +134,7 @@ export default function ChallengeClubCard({ petCount = 0 }) {
                         {minDaysLeft} free day{minDaysLeft !== 1 ? "s" : ""} remaining
                     </Text>
                 </View>
-            ) : null}
+            ) : null}*/}
 
             {/* Per-pet streak summary */}
             {petSummaries.length > 0 ? (
@@ -142,29 +150,36 @@ export default function ChallengeClubCard({ petCount = 0 }) {
                             }}
                         >
                             <View style={{
-                                width: 28, height: 28, borderRadius: 14,
-                                backgroundColor: pet.streak > 0 ? t.colors.primary + "20" : t.colors.text + "10",
-                                alignItems: "center", justifyContent: "center",
+                                width: 45,
+                                height: 45,
+                                borderRadius: 999,
+                                backgroundColor: t.colors.primary + "20",
+                                alignItems: "center",
+                                justifyContent: "center",
                             }}>
-                                <Ionicons name="paw" size={14} color={pet.streak > 0 ? t.colors.primary : t.colors.text} style={{ opacity: pet.streak > 0 ? 1 : 0.3 }} />
+                                {Number(pet.streak) > 0 && getBadgeTier(pet.streak)?.emoji ? (
+                                    <Text style={{ fontSize: 21 }}>
+                                        {getBadgeTier(pet.streak)?.emoji}
+                                    </Text>
+                                ) : (
+                                    <Ionicons name="paw" size={17} color={t.colors.primary} />
+                                )}
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={[g.text, { fontSize: 13, fontWeight: "600" }]}>{pet.name}</Text>
-                                <Text style={[g.text, { fontSize: 11, opacity: 0.6 }]}>
-                                    {pet.streak > 0
-                                        ? `${getBadgeTier(pet.streak)?.emoji || "🐾"} ${pet.streak} day streak`
-                                        : "No streak yet — start today!"}
+                                <Text style={[g.subTitle, { fontSize: 18, marginBottom: -4 }]}>{pet.name}</Text>
+                                <Text style={[g.text, {fontSize: 13}]}>
+                                    {pet.streak > 0 ? `${pet.streak} day streak` : "No streak yet — start today!"}
                                 </Text>
                             </View>
                             {pet.todayDone ? (
-                                <Ionicons name="checkmark-circle" size={18} color="#22c55e" />
+                                <Ionicons name="checkmark-circle" size={26} color="#22c55e" />
                             ) : (
                                 <View style={{
                                     backgroundColor: t.colors.primary,
-                                    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+                                    borderRadius: 8, paddingHorizontal: 13, paddingVertical: 9,
                                 }}>
-                                    <Text style={{ color: t.colors.textOverPrimary, fontSize: 11, fontWeight: "700" }}>
-                                        GO
+                                    <Text style={{ color: t.colors.textOverPrimary, fontSize: 14, fontWeight: "700" }}>
+                                        Go
                                     </Text>
                                 </View>
                             )}
@@ -172,18 +187,21 @@ export default function ChallengeClubCard({ petCount = 0 }) {
                     ))}
                 </View>
             ) : null}
-            {petCount === 0 ? (
-                <Pressable
+
+            <View style={{marginTop: 10}}>
+                <TTButton
+                    title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
+                    variant="secondary"
+                    onPress={() => router.push(petCount > 0 ? "/profiles" : "/profiles/edit")}
+                />
+            </View>
+
+            {/*{petCount === 0 ? (
+                <TTButton
+                    variant="secondary"
                     onPress={() => router.push("/profiles/edit")}
-                    style={{
-                        backgroundColor: t.colors.primary, borderRadius: 10,
-                        paddingVertical: 12, alignItems: "center",
-                    }}
-                >
-                    <Text style={{ color: t.colors.textOverPrimary, fontWeight: "700" }}>
-                        Set Up A Pet Profile
-                    </Text>
-                </Pressable>
+                    title="Set Up A Pet Profile"
+                />
             ) : trialOver ? (
                 <Pressable
                     onPress={() => router.push("/paywall")}
@@ -198,7 +216,7 @@ export default function ChallengeClubCard({ petCount = 0 }) {
                         Go Pro to Continue
                     </Text>
                 </Pressable>
-            ) : null}
+            ) : null}*/}
         </View>
     );
 }

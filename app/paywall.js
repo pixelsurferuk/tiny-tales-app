@@ -19,7 +19,7 @@ import { useTTAlert } from "../src/components/ui/TTAlert";
 function getSourceCopy(source) {
     if (source === "chat") return { title: "Out of credits", subtitle: "Buy more credits to keep chatting with your pet." };
     if (source === "thoughts") return { title: "Out of credits", subtitle: "Top up your credits to generate more thoughts." };
-    return { title: "Get More Tiny Tales Credits", subtitle: "Buy credits for thoughts and chat." };
+    return { title: "Get More From Tiny Tales", subtitle: "Buy credits for thoughts and chats." };
 }
 
 function Benefit({ icon, text, styles }) {
@@ -298,7 +298,7 @@ export default function Paywall() {
                         ) : adLimitReached ? (
                             <View style={[styles.freeCard, { flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }]}>
                                 <Text style={[styles.freeTitle, { textAlign: "center" }]}>Daily free credit limit reached</Text>
-                                <Text style={[styles.freeSubtitle, { textAlign: "center", opacity: 0.7 }]}>
+                                <Text style={[styles.freeSubtitle, { textAlign: "center"}]}>
                                     You've watched all your ads for today. Come back tomorrow for more free credits!
                                 </Text>
                             </View>
@@ -320,6 +320,7 @@ export default function Paywall() {
                             {/*<Text style={styles.proSubtitle}>Unlimited credits and no ads.</Text>*/}
                             <View style={styles.benefitsRow}>
                                 <Benefit icon="sparkles" text="Unlimited Credits" styles={styles} />
+                                <Benefit icon="trophy" text="Pet Challenges" styles={styles} />
                                 <Benefit icon="shield-checkmark" text="No ads" styles={styles} />
                             </View>
                             <TTButton

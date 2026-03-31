@@ -18,21 +18,12 @@ import {
     getLocalStreak, getLocalBadges, saveLocalStreak, saveLocalBadges,
     getTodayChallenge, saveTodayChallenge,
     todayUTC, daysBetween,
-    getGlobalDaysLeft,
+    getGlobalDaysLeft, getBadgeTier, clearLocalChallengeData,
 } from "../src/services/challengeService";
 import { useTTAlert } from "../src/components/ui/TTAlert";
 import { AppBannerAd } from "../src/ads/admob";
 
 const STREAK_MILESTONES = [7, 14, 21, 28, 35];
-
-function getBadgeTier(count) {
-    if (count >= 35) return { label: "Diamond", emoji: "💎", color: "#a8d8ea" };
-    if (count >= 28) return { label: "Platinum", emoji: "⚡", color: "#e5e4e2" };
-    if (count >= 21) return { label: "Gold", emoji: "🥇", color: "#FFD700" };
-    if (count >= 14) return { label: "Silver", emoji: "🥈", color: "#C0C0C0" };
-    if (count >= 7)  return { label: "Bronze", emoji: "🥉", color: "#CD7F32" };
-    return null;
-}
 
 function getNextMilestone(count) {
     return STREAK_MILESTONES.find(m => m > count) || null;
@@ -134,12 +125,11 @@ export default function PetChallengeClub() {
             setCompleted(true);
 
             const today = todayUTC();
-            const lastDate = streak.lastCompletedDate;
-            const isConsecutive = lastDate && daysBetween(lastDate, today) === 1;
-            const alreadyToday = lastDate === today;
+            const alreadyToday = streak.lastCompletedDate === today;
 
             if (!alreadyToday) {
-                const newCount = isConsecutive ? streak.count + 1 : 1;
+                const newCount = result.streak; // server is source of truth
+                const isConsecutive = newCount > 1;
                 const newStartDate = isConsecutive ? streak.startDate : today;
                 const newStreak = { count: newCount, lastCompletedDate: today, startDate: newStartDate };
                 setStreak(newStreak);
@@ -156,6 +146,7 @@ export default function PetChallengeClub() {
                 ...challenge,
                 completedAt: new Date().toISOString(),
                 reaction: result.reaction,
+                trialStartedAt: challenge.trialStartedAt,
             });
         } catch (e) {
             alert("Couldn't complete", "Something went wrong. Try again!");
@@ -204,7 +195,7 @@ export default function PetChallengeClub() {
                 <Pressable onPress={() => router.back()} style={g.screenHeaderBtn}>
                     <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
-                <Text style={g.screenHeaderTitle}>Challenge Club</Text>
+                <Text style={g.screenHeaderTitle}>Pet Challenges</Text>
                 <View style={{ width: 60 }} />
             </View>
 
@@ -235,22 +226,24 @@ export default function PetChallengeClub() {
                         </Pressable>
                     </View>
                 ) : !isPro && inTrial ? (
-                    <View style={{
-                        backgroundColor: t.colors.primary + "18",
-                        borderRadius: 12, padding: 12, borderWidth: 1,
-                        borderColor: t.colors.primary + "40",
-                        flexDirection: "row", alignItems: "center", gap: 10,
-                    }}>
-                        <Ionicons name="time-outline" size={20} color={t.colors.primary} />
-                        <View style={{ flex: 1 }}>
-                            <Text style={[g.subTitle, { fontSize: 13, marginBottom: 0 }]}>
-                                {daysLeftInTrial} free day{daysLeftInTrial !== 1 ? "s" : ""} remaining
-                            </Text>
-                            <Text style={[g.text, { fontSize: 12, opacity: 0.7 }]}>
-                                Subscribe before your trial ends to keep your streak 🔥
-                            </Text>
-                        </View>
-                    </View>
+                    <>
+                        {/*<View style={{
+                            backgroundColor: t.colors.primary + "18",
+                            borderRadius: 12, padding: 12, borderWidth: 1,
+                            borderColor: t.colors.primary + "40",
+                            flexDirection: "row", alignItems: "center", gap: 10,
+                        }}>
+                            <Ionicons name="time-outline" size={20} color={t.colors.primary} />
+                            <View style={{ flex: 1 }}>
+                                <Text style={[g.subTitle, { fontSize: 13, marginBottom: 0 }]}>
+                                    {daysLeftInTrial} free day{daysLeftInTrial !== 1 ? "s" : ""} remaining
+                                </Text>
+                                <Text style={[g.text, { fontSize: 12, opacity: 0.7 }]}>
+                                    Subscribe before your trial ends to keep your streak 🔥
+                                </Text>
+                            </View>
+                        </View>*/}
+                    </>
                 ) : null}
 
                 {/* Streak + badges */}
@@ -260,13 +253,13 @@ export default function PetChallengeClub() {
                 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                         <View style={{ flex: 1 }}>
-                            <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            <View style={{ flexDirection: "row" }}>
                                 {badgeTier ? (
                                     <Text style={{ fontSize: 24, marginRight: 8 }}>{badgeTier.emoji}</Text>
                                 ) : null}
-                                <Text style={[g.subTitle, { fontSize: 22 }]}>{streak.count} day streak</Text>
+                                <Text style={[g.subTitle, { fontSize: 26, marginTop: 3 }]}>{streak.count} day streak</Text>
                             </View>
-                            <Text style={[g.text, { fontSize: 12, opacity: 0.6, marginTop: 2 }]}>
+                            <Text style={[g.text, { fontSize: 14,marginTop: -5 }]}>
                                 {streak.count === 0
                                     ? "Complete today's challenge to start your streak"
                                     : badgeTier
@@ -277,8 +270,7 @@ export default function PetChallengeClub() {
                             </Text>
                         </View>
                         {activePet.avatarUri ? (
-                            <Image source={{ uri: activePet.avatarUri }}
-                                   style={{ width: 44, height: 44, borderRadius: 22 }} />
+                            <Image source={{ uri: activePet.avatarUri }} style={{ width: 55, height: 55, borderRadius: 999 }} />
                         ) : null}
                     </View>
 
@@ -326,7 +318,7 @@ export default function PetChallengeClub() {
                     </View>
 
                     {badges.length > 0 ? (
-                        <Text style={[g.text, { fontSize: 11, opacity: 0.5, marginTop: 8, textAlign: "center" }]}>
+                        <Text style={[g.text, { fontSize: 13, marginTop: 10, textAlign: "center" }]}>
                             {badges.length} total challenge{badges.length !== 1 ? "s" : ""} completed
                         </Text>
                     ) : null}
@@ -357,7 +349,7 @@ export default function PetChallengeClub() {
                             ) : null}
                         </View>
 
-                        <Text style={[g.subTitle, { fontSize: 18, marginBottom: 8 }]}>
+                        <Text style={[g.subTitle, { fontSize: 22, marginBottom: 8 }]}>
                             {challenge.title}
                         </Text>
                         <Text style={[g.text, { lineHeight: 22, marginBottom: 12, opacity: 0.8 }]}>
@@ -383,12 +375,12 @@ export default function PetChallengeClub() {
                                 borderRadius: 12, padding: 12, marginBottom: 12,
                                 borderWidth: 1, borderColor: t.colors.primary + "30",
                             }}>
-                                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
                                     {activePet.avatarUri ? (
                                         <Image source={{ uri: activePet.avatarUri }}
                                                style={{ width: 24, height: 24, borderRadius: 12 }} />
                                     ) : null}
-                                    <Text style={[g.text, { fontSize: 12, fontWeight: "700", color: t.colors.primary }]}>
+                                    <Text style={[g.text, { fontSize: 16, fontWeight: "700", color: t.colors.primary }]}>
                                         {activePet.name} says:
                                     </Text>
                                 </View>
@@ -399,7 +391,7 @@ export default function PetChallengeClub() {
                         {!completed ? (
                             canUse ? (
                                 <TTButton
-                                    title={completing ? "Reacting…" : "We did it! 🐾"}
+                                    title={completing ? "Reacting…" : "We did it!"}
                                     onPress={handleComplete}
                                     disabled={completing}
                                     leftIcon={completing
@@ -416,25 +408,33 @@ export default function PetChallengeClub() {
                             )
                         ) : (
                             <View style={{ alignItems: "center", paddingVertical: 8 }}>
-                                <Text style={[g.text, { opacity: 0.5, fontSize: 13 }]}>
-                                    Come back tomorrow for your next challenge 🐾
+                                <Text style={[g.text, { fontSize: 13 }]}>
+                                    Come back tomorrow for your next challenge
                                 </Text>
                             </View>
                         )}
 
                         {__DEV__ ? (
-                            <Pressable onPress={async () => {
-                                const fakeCount = 14;
-                                const fakeStreak = { count: fakeCount, lastCompletedDate: todayUTC(), startDate: "2026-03-01" };
-                                const fakeBadges = Array.from({ length: fakeCount }, (_, i) => ({
-                                    date: todayUTC(), streakDay: i + 1,
-                                }));
-                                await saveLocalStreak(activePet.id, fakeStreak);
-                                await saveLocalBadges(activePet.id, fakeBadges);
-                                load();
-                            }} style={{ padding: 10, marginTop: 8 }}>
-                                <Text style={{ color: "orange", textAlign: "center" }}>DEV: Set 14 day streak</Text>
-                            </Pressable>
+                            <>
+                                <Pressable onPress={async () => {
+                                    const fakeCount = 14;
+                                    const fakeStreak = { count: fakeCount, lastCompletedDate: todayUTC(), startDate: "2026-03-01" };
+                                    const fakeBadges = Array.from({ length: fakeCount }, (_, i) => ({
+                                        date: todayUTC(), streakDay: i + 1,
+                                    }));
+                                    await saveLocalStreak(activePet.id, fakeStreak);
+                                    await saveLocalBadges(activePet.id, fakeBadges);
+                                    load();
+                                }} style={{ padding: 10, marginTop: 8 }}>
+                                    <Text style={{ color: "orange", textAlign: "center" }}>DEV: Set 14 day streak</Text>
+                                </Pressable>
+                                <Pressable onPress={async () => {
+                                    await clearLocalChallengeData(activePet.id);
+                                    load();
+                                }} style={{ padding: 10 }}>
+                                    <Text style={{ color: "tomato", textAlign: "center" }}>DEV: Reset all challenge data</Text>
+                                </Pressable>
+                            </>
                         ) : null}
                     </View>
                 ) : null}

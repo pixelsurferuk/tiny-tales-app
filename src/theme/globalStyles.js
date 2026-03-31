@@ -15,7 +15,7 @@ const base = {
     radius: { sm: 8, md: 12, lg: 16, xl: 24 },
 
     font: {
-        xs: 12, sm: 14, md: 16, lg: 20, xl: 28,
+        xs: 12, sm: 15, md: 16, lg: 20, xl: 26, xxl: 34,
     },
 
     fontFamily: {
@@ -50,12 +50,12 @@ const palettes = {
             cardBG: "#FFFFFF",
             text: "#1B1F2A",
             textMuted: "rgba(27,31,42,0.7)",
-            textOverPrimary: "#FFFFFF",
+            textOverPrimary: "#1B1F2A",
             textOverSecondary: "#FFFFFF",
-            textOverSuccess: "#FFFFFF",
+            textOverSuccess: "#333333",
             textOverDanger: "#FFFFFF",
             border: "rgba(0,0,0,0.08)",
-            primary: "#4cb6ac",
+            primary: "#5dd5c9",
             secondary: "#9675ce",
             third: "#E8637A",
             textOverThird: "#FFFFFF",
@@ -73,12 +73,12 @@ const palettes = {
             cardBG: "#2d2d35",
             text: "#F5F7FF",
             textMuted: "rgba(245,247,255,0.7)",
-            textOverPrimary: "#FFFFFF",
+            textOverPrimary: "#1B1F2A",
             textOverSecondary: "#FFFFFF",
-            textOverSuccess: "#FFFFFF",
+            textOverSuccess: "#333333",
             textOverDanger: "#FFFFFF",
             border: "rgba(255,255,255,0.1)",
-            primary: "#4cb6ac",
+            primary: "#5dd5c9",
             secondary: "#9675ce",
             third: "#E8637A",
             textOverThird: "#FFFFFF",
@@ -116,20 +116,20 @@ export function useGlobalStyles(t) {
         // Typography
         title: {
             fontFamily: t.fontFamily.title,
-            fontSize: t.font.xl,
-            lineHeight: t.font.xl * 1.2,
+            fontSize: t.font.xxl,
+            lineHeight: t.font.xxl * 1.2,
             color: t.colors.text,
             marginBottom: 8
         },
         subTitle: {
             fontFamily: t.fontFamily.title,
-            fontSize: 22,
-            lineHeight: t.font.lg * 1.3,
+            fontSize: t.font.xl,
+            lineHeight: t.font.xl * 1.2,
             color: t.colors.text,
             marginBottom: 8
         },
         body: { fontFamily: t.fontFamily.regular, color: t.colors.text, flex: 1, backgroundColor: t.colors.bg },
-        text: { fontFamily: t.fontFamily.regular, fontSize: t.font.md, color: t.colors.text, lineHeight: t.font.md * 1.5,},
+        text: { fontFamily: t.fontFamily.regular, fontSize: t.font.sm, color: t.colors.text, lineHeight: t.font.sm * 1.5,},
         textMuted: { color: t.colors.textMuted },
 
         // Surfaces
@@ -305,28 +305,23 @@ export const makeHomeStyles = (t) =>
         },
         badgeText: {
             color: t.colors.textOverPrimary,
-            lineHeight: 45,
+            lineHeight: 48,
             fontSize: 28,
             fontFamily: t.fontFamily.logo,
             paddingBottom: 3,
             paddingHorizontal: 20
         },
         subtitle: { color: t.colors.text, opacity: 0.78 },
-        featureRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginTop: 2 },
+        featureRow: { flexDirection: "row", flexWrap: "wrap", gap: 17, marginVertical: 10},
         featurePill: {
             flexDirection: "row",
             alignItems: "center",
-            gap: 6,
-            marginBottom: 5,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            borderRadius: 999,
-            borderWidth: 1,
+            gap: 7,
             borderColor: t.colors.border,
             backgroundColor: t.colors.cardBG,
 
         },
-        featurePillText: {fontSize: 13, fontFamily: t.fontFamily.title },
+        featurePillText: {fontSize: 16, fontFamily: t.fontFamily.title },
         buttons: { gap: 12 },
     });
 
@@ -542,7 +537,7 @@ export const makeAskStyles = (t) =>
         offlineText: { fontSize: 12, color: "#333" },
 
         chatOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 },
-        chatPanel: { flex: 1, backgroundColor: "rgba(10,12,18,0.4)" },
+        chatPanel: { flex: 1, backgroundColor: "rgba(255,255,255,0.4)" },
         chatContent: {
             flexGrow: 1,
             justifyContent: "flex-end",
@@ -688,14 +683,14 @@ export const makePaywallStyles = (t) =>
         freeCardLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
         freeIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: t.colors.third, alignItems: "center", justifyContent: "center" },
         freeTitle: { color: t.colors.text, fontSize: 20, fontFamily: t.fontFamily.title },
-        freeSubtitle: { color: t.colors.text, opacity: 0.72, fontSize: 12, marginTop: 2 },
+        freeSubtitle: { color: t.colors.text, fontSize: 13, marginTop: 2 },
         freeButton: { height: 41, borderRadius: t.radius.sm, backgroundColor: t.colors.third, alignItems: "center", justifyContent: "center" },
         freeButtonText: { fontSize: 17, fontFamily: t.fontFamily.title, color: t.colors.textOverSecondary },
-        rewardStatusText: { color: t.colors.text, opacity: 0.72, fontSize: 12, textAlign: "center", marginTop: 4 },
+        rewardStatusText: { color: t.colors.text, fontSize: 13, textAlign: "center", marginTop: 4 },
 
         sectionHeader: { gap: 2, marginTop: 2 },
         sectionTitle: { color: t.colors.text, fontSize: 22, fontFamily: t.fontFamily.title },
-        sectionSub: { color: t.colors.text, opacity: 0.72, fontSize: 13 },
+        sectionSub: { color: t.colors.text, fontSize: 13 },
         loadingWrap: { paddingVertical: 18, alignItems: "center", justifyContent: "center" },
         grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "space-between" },
         packCard: {
@@ -822,7 +817,7 @@ export const makeThoughtBottomBarStyles = (t) =>
 export const makeTTButtonStyles = (t) =>
     StyleSheet.create({
         base: {
-            minHeight: 44,
+            minHeight: 48,
             paddingHorizontal: t.spacing.xl,
             borderRadius: t.radius.sm,
             alignItems: "center",

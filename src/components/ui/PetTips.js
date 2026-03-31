@@ -8,8 +8,8 @@ import { API } from "../../services/ai";
 import { useEntitlements } from "../../state/entitlements";
 
 const TABS = [
-    { key: "training", label: "Training Tip", icon: "ribbon-outline" },
-    { key: "activity", label: "Brain Game", icon: "bulb-outline" },
+    { key: "training", label: "Training Tips", icon: "ribbon-outline" },
+    { key: "activity", label: "Brain Games", icon: "bulb-outline" },
 ];
 
 const POOL_SIZE = 20;
@@ -249,21 +249,19 @@ export default function PetTips({ pet, onBeforeGenerate }) {
                                 justifyContent: "center",
                                 gap: 6,
                                 paddingVertical: 9,
-                                borderRadius: 10,
-                                backgroundColor: active ? t.colors.primary : cardBg,
-                                borderWidth: 1,
-                                borderColor: active ? t.colors.primary : border,
+                                borderRadius: 8,
+                                backgroundColor: t.colors.primary,
                             }}
                         >
                             <Ionicons
                                 name={tab.icon}
                                 size={15}
-                                color={active ? t.colors.textOverPrimary : t.colors.text}
+                                color={t.colors.textOverPrimary}
                             />
                             <Text style={{
                                 fontSize: 13,
                                 fontWeight: "600",
-                                color: active ? t.colors.textOverPrimary : t.colors.text,
+                                color: t.colors.textOverPrimary,
                             }}>
                                 {tab.label}
                             </Text>
@@ -291,13 +289,13 @@ export default function PetTips({ pet, onBeforeGenerate }) {
                         <Pressable
                             onPress={handleClose}
                             style={{
-                                width: 32, height: 32, borderRadius: 999,
+                                width: 44, height: 44, borderRadius: 999,
                                 alignItems: "center", justifyContent: "center",
                                 borderWidth: 1, borderColor: t.colors.text + "22",
                             }}
                             hitSlop={10}
                         >
-                            <Ionicons name="close" size={16} color={t.colors.text} />
+                            <Ionicons name="close" size={20} color={t.colors.text} />
                         </Pressable>
                     </View>
 
@@ -368,7 +366,7 @@ export default function PetTips({ pet, onBeforeGenerate }) {
                     ) : currentTip ? (
                         <View>
                             {currentTip.title && (
-                                <Text style={[g.subTitle, { marginBottom: 8, fontSize: 17, paddingRight: 8 }]}>
+                                <Text style={[g.subTitle, { marginBottom: 8, fontSize: 24, paddingRight: 8 }]}>
                                     {currentTip.title}
                                 </Text>
                             )}
@@ -394,8 +392,8 @@ export default function PetTips({ pet, onBeforeGenerate }) {
                                     marginTop: 10, padding: 10, borderRadius: 8,
                                     backgroundColor: t.colors.primary + "18",
                                 }}>
-                                    <Text style={[g.text, { fontSize: 12, opacity: 0.8, lineHeight: 18 }]}>
-                                        💡 {currentTip.why}
+                                    <Text style={[g.text, { fontSize: 14, lineHeight: 18 }]}>
+                                        {currentTip.why}
                                     </Text>
                                 </View>
                             )}

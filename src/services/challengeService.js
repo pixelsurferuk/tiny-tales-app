@@ -18,6 +18,17 @@ function getBadgesKey(petId) {
     return `tiny_tales_challenge_badges_${petId}`;
 }
 
+// ─── Badge tier ───────────────────────────────────────────────────────────────
+
+export function getBadgeTier(count) {
+    if (count >= 35) return { label: "Diamond", emoji: "💎", color: "#a8d8ea" };
+    if (count >= 28) return { label: "Platinum", emoji: "⚡", color: "#e5e4e2" };
+    if (count >= 21) return { label: "Gold",     emoji: "🥇", color: "#FFD700" };
+    if (count >= 14) return { label: "Silver",   emoji: "🥈", color: "#C0C0C0" };
+    if (count >= 7)  return { label: "Bronze",   emoji: "🥉", color: "#CD7F32" };
+    return null;
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 export function todayUTC() {
@@ -71,6 +82,14 @@ export async function saveLocalStreak(petId, streak) {
 
 export async function saveLocalBadges(petId, badges) {
     await AsyncStorage.setItem(getBadgesKey(petId), JSON.stringify(badges));
+}
+
+export async function clearLocalChallengeData(petId) {
+    await Promise.all([
+        AsyncStorage.removeItem(getStreakKey(petId)),
+        AsyncStorage.removeItem(getBadgesKey(petId)),
+        AsyncStorage.removeItem(getTodayKey(petId)),
+    ]);
 }
 
 export async function getTodayChallenge(petId) {
