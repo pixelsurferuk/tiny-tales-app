@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View, Text, Pressable, Image, ScrollView } from "react-native";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,12 +6,10 @@ import { Ionicons } from "@expo/vector-icons";
 import Screen from "../../src/components/ui/Screen";
 import TTButton from "../../src/components/ui/TTButton";
 import { useTTTheme, useGlobalStyles, makeProfilesStyles } from "../../src/theme/globalStyles";
-import { getPets, deletePet, setActivePetId, getActivePetId, summarizePetForPrompt } from "../../src/services/pets";
+import { getPets, deletePet, setActivePetId, getActivePetId } from "../../src/services/pets";
 import { AppBannerAd } from "../../src/ads/admob";
 import { useEntitlements } from "../../src/state/entitlements";
 import { useTTAlert } from "../../src/components/ui/TTAlert";
-import { useAdGate } from "../../src/ads/useAdGate";
-import PetTips from "../../src/components/ui/PetTips";
 import AuthCreditsBar from "../../src/components/auth/AuthCreditsBar";
 import { debouncedPushSync } from "../../src/services/syncService";
 import { getLocalStreak, getTodayChallenge, getGlobalDaysLeft, getBadgeTier } from "../../src/services/challengeService";
@@ -36,19 +34,8 @@ export default function ProfilesScreen() {
     const t = useTTTheme();
     const g = useGlobalStyles(t);
     const styles = useMemo(() => makeProfilesStyles(t), [t]);
-    const { isPro, server, refreshAll, deviceId } = useEntitlements();
+    const { isPro, server, deviceId } = useEntitlements();
     const alert = useTTAlert();
-
-    const pendingConfirmedRef = useRef(null);
-
-    const { tryWatchAd } = useAdGate({
-        onCreditsGranted: () => {
-            refreshAll({ reason: "profiles_ad_credit" });
-            pendingConfirmedRef.current?.();
-            pendingConfirmedRef.current = null;
-        },
-        onLimitReached: () => router.push("/paywall"),
-    });
 
     const load = useCallback(async () => {
         try {
@@ -128,30 +115,6 @@ export default function ProfilesScreen() {
         router.push({ pathname: "/ask", params: { uri: pet.avatarUri, src: "profiles", petId: pet.id } });
     }, []);
 
-    const handleBeforeGenerate = useCallback((pet, tab, onConfirmed, onCancel) => {
-        const creditsRemaining = server?.creditsRemaining ?? 0;
-
-        if (!isPro && creditsRemaining <= 0) {
-            pendingConfirmedRef.current = onConfirmed;
-            tryWatchAd();
-            return;
-        }
-
-        if (!isPro) {
-            alert(
-                "Uses 1 credit",
-                `Getting a ${tab === "training" ? "training tip" : "brain game"} uses 1 credit. You have ${creditsRemaining} remaining.`,
-                [
-                    { text: "Continue", onPress: onConfirmed },
-                    { text: "Cancel", style: "cancel", onPress: onCancel },
-                ]
-            );
-            return;
-        }
-
-        onConfirmed();
-    }, [isPro, server?.creditsRemaining, tryWatchAd]);
-
     const tabBtn = (active) => ({
         flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
         gap: 6, paddingVertical: 9, borderRadius: 8,
@@ -230,25 +193,21 @@ export default function ProfilesScreen() {
                                     </View>
                                 </Pressable>
 
-                                {/* Thoughts + Chat */}
+                                {/* Thoughts + Chat + Tips */}
                                 <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
                                     <Pressable style={tabBtn(false)} onPress={() => onGetThought(pet)}>
                                         <Ionicons name="bulb-outline" size={15} color={t.colors.textOverPrimary} />
-                                        <Text style={tabBtnText(false)}>Pet thoughts</Text>
+                                        <Text style={tabBtnText(false)}>Thoughts</Text>
                                     </Pressable>
                                     <Pressable style={tabBtn(false)} onPress={() => onChat(pet)}>
                                         <Ionicons name="chatbubble-outline" size={15} color={t.colors.textOverPrimary} />
-                                        <Text style={tabBtnText(false)}>Chat to pet</Text>
+                                        <Text style={tabBtnText(false)}>Chat</Text>
+                                    </Pressable>
+                                    <Pressable style={tabBtn(false)} onPress={() => router.push({ pathname: "/profiles/tips", params: { petId: pet.id } })}>
+                                        <Ionicons name="ribbon-outline" size={15} color={t.colors.textOverPrimary} />
+                                        <Text style={tabBtnText(false)}>Tips</Text>
                                     </Pressable>
                                 </View>
-
-
-
-                                {/* PetTips always visible */}
-                                <PetTips
-                                    pet={summarizePetForPrompt(pet)}
-                                    onBeforeGenerate={(tab, onConfirmed, onCancel) => handleBeforeGenerate(pet, tab, onConfirmed, onCancel)}
-                                />
 
                                 {/* Challenge streak row */}
                                 {cd ? (
