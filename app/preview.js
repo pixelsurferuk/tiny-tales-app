@@ -22,7 +22,6 @@ import { parseCreditsFromResponse } from "../src/utils/credits";
 import { setAndroidNavBarStyle } from "../src/utils/navBar";
 import { useEntitlements } from "../src/state/entitlements";
 import { CREDIT_ERROR_CODES } from "../src/config";
-import { useTTAlert } from "../src/components/ui/TTAlert";
 import { useAdGate } from "../src/ads/useAdGate";
 import PetHeader from "../src/components/ui/PetHeader";
 import AuthCreditsBar from "../src/components/auth/AuthCreditsBar";
@@ -49,7 +48,7 @@ export default function Preview() {
     const [busy, setBusy] = useState(false);
     const [imageLoaded, setImageLoaded] = useState(false);
     const [showCaption, setShowCaption] = useState(false);
-    const [serverOnline, setServerOnline] = useState(true);
+    const [, setServerOnline] = useState(true);
     const [adRefresh, setAdRefresh] = useState(0);
     const [activePet, setActivePet] = useState(null);
 
@@ -65,8 +64,6 @@ export default function Preview() {
 
     const getParam = (p) => Array.isArray(p) ? p[0] : p;
     const from = typeof getParam(params?.from) === "string" ? getParam(params.from) : null;
-
-    const alert = useTTAlert();
 
     useEffect(() => {
         setAndroidNavBarStyle("light");

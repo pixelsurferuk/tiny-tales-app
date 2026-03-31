@@ -1,5 +1,5 @@
 // src/components/ui/PetTips.js
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -237,7 +237,6 @@ export default function PetTips({ pet, onBeforeGenerate }) {
             {/* Tab row — free to open, no credit check */}
             <View style={{ flexDirection: "row", gap: 8, marginBottom: activeTab ? 10 : 0 }}>
                 {TABS.map((tab) => {
-                    const active = activeTab === tab.key;
                     return (
                         <Pressable
                             key={tab.key}

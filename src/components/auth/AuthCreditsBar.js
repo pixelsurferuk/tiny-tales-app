@@ -1,15 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { View, Text, ActivityIndicator } from "react-native";
 import { router } from "expo-router";
 
 import { useTTTheme, makeAuthCreditsBarStyles, useGlobalStyles } from "../../theme/globalStyles";
 import { useEntitlements } from "../../state/entitlements";
 import { useAuth } from "../../state/auth";
-import { logout } from "../../services/auth";
 import TTButton from "../ui/TTButton";
 import { TEST_FORCE_ZERO_CREDITS } from "../../config";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import LoginGateButton from "./LoginGateButton";
 
 export default function AuthCreditsBar({ style, compact = false, homePage = false }) {
     const t = useTTTheme();
@@ -18,18 +15,10 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
     const { server, isPro, refreshAll, refreshIdentity } = useEntitlements();
     const { isLoggedIn, email } = useAuth();
     const totalCredits = server?.creditsTotal ?? 0;
-    const [hasLoggedInBefore, setHasLoggedInBefore] = useState(false);
-    const [busy, setBusy] = useState(false);
     const realCredits = server?.creditsRemaining ?? 0;
     const effectiveCredits = TEST_FORCE_ZERO_CREDITS ? 0 : realCredits;
 
     const showBar = effectiveCredits <= 0 || totalCredits > 3 || isLoggedIn;
-
-    useEffect(() => {
-        AsyncStorage.getItem("tiny_tales_has_logged_in")
-            .then(val => setHasLoggedInBefore(val === "true"))
-            .catch(() => {});
-    }, []);
 
     useEffect(() => {
         (async () => {
@@ -41,21 +30,6 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
             }
         })();
     }, [isLoggedIn, refreshIdentity, refreshAll]);
-
-    const handleLogout = async () => {
-        if (busy) return;
-        try {
-            setBusy(true);
-            await logout();
-            await refreshIdentity?.();
-            await refreshAll?.({ reason: "logout", retries: 1, delayMs: 250 });
-            router.replace("/");
-        } catch (e) {
-            console.warn("Logout failed", e);
-        } finally {
-            setBusy(false);
-        }
-    };
 
     // ─── Compact mode — slim bar for ask/preview screens ─────────────────────
     if (compact) {

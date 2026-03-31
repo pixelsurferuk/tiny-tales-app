@@ -1,6 +1,6 @@
 // src/components/auth/LoginGateButton.js
 import React, { useState } from "react";
-import { View, Modal } from "react-native";
+import { Modal } from "react-native";
 import { useAuth } from "../../state/auth";
 import TTButton from "../ui/TTButton";
 import InlineLoginGate from "./InlineLoginGate";

@@ -1,5 +1,5 @@
 // app/challenge.js
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     View, Text, Pressable, ScrollView, ActivityIndicator, Image
 } from "react-native";
@@ -17,7 +17,7 @@ import {
     fetchTodayChallenge, completeChallenge,
     getLocalStreak, getLocalBadges, saveLocalStreak, saveLocalBadges,
     getTodayChallenge, saveTodayChallenge,
-    todayUTC, daysBetween,
+    todayUTC,
     getGlobalDaysLeft, getBadgeTier, clearLocalChallengeData,
 } from "../src/services/challengeService";
 import { useTTAlert } from "../src/components/ui/TTAlert";
@@ -32,7 +32,7 @@ function getNextMilestone(count) {
 export default function PetChallengeClub() {
     const t = useTTTheme();
     const g = useGlobalStyles(t);
-    const { deviceId: identityId, isPro, server } = useEntitlements();
+    const { deviceId: identityId, isPro } = useEntitlements();
     const alert = useTTAlert();
     const params = useLocalSearchParams();
     const petIdParam = params?.petId ? String(params.petId) : null;
@@ -148,7 +148,7 @@ export default function PetChallengeClub() {
                 reaction: result.reaction,
                 trialStartedAt: challenge.trialStartedAt,
             });
-        } catch (e) {
+        } catch {
             alert("Couldn't complete", "Something went wrong. Try again!");
         } finally {
             setCompleting(false);

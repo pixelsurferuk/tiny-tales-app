@@ -285,7 +285,7 @@ export default function Ask() {
         onLimitReached: openPaywall,
     });
 
-    const { messages, isTyping, sendMessage, serverOnline } = usePetChat(activePet, displayUri, {
+    const { messages, isTyping, sendMessage } = usePetChat(activePet, displayUri, {
         deviceId,
         isPro,
         onPaywall: () => {

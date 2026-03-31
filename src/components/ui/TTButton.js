@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Pressable, Text, ActivityIndicator } from "react-native";
-import {useTTTheme, makeTTButtonStyles, useGlobalStyles} from "../../theme/globalStyles";
+import { useTTTheme, makeTTButtonStyles } from "../../theme/globalStyles";
 
 export default function TTButton({
     title,
@@ -15,7 +15,6 @@ export default function TTButton({
 }) {
     const t = useTTTheme();
     const s = useMemo(() => makeTTButtonStyles(t), [t]);
-    const g = useGlobalStyles(t);
 
     const vStyle =
         variant === "secondary" ? s.secondary :

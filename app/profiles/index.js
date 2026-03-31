@@ -29,7 +29,7 @@ export default function ProfilesScreen() {
     const isSelectMode = params?.mode === "select";
 
     const [pets, setPets] = useState([]);
-    const [activeId, setActiveId] = useState(null);
+    const [, setActiveId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [challengeData, setChallengeData] = useState({}); // { [petId]: { streak, todayDone, daysLeft } }
 

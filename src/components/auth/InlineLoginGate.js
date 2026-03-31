@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, ActivityIndicator } from "react-nativ
 import { router } from "expo-router";
 
 import { useTTTheme, makeInlineLoginGateStyles } from "../../theme/globalStyles";
-import { sendLoginCode, verifyLoginCode, getAccessToken } from "../../services/auth";
+import { sendLoginCode, verifyLoginCode } from "../../services/auth";
 import { getStableGuestId } from "../../services/guestId";
 import { useAuth } from "../../state/auth";
 import { useEntitlements } from "../../state/entitlements";
@@ -30,20 +30,6 @@ export default function InlineLoginGate({
     const [busy, setBusy] = useState(false);
     const [sent, setSent] = useState(false);
     const alert = useTTAlert();
-
-    const applyLoginBonus = async (identityId) => {
-        try {
-            const accessToken = await getAccessToken().catch(() => null);
-            if (!accessToken) return;
-            await fetch(`${API}/auth/login-bonus`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-                body: JSON.stringify({ identityId }),
-            });
-        } catch (e) {
-            console.warn("[login-bonus] failed:", e?.message || e);
-        }
-    };
 
     const transferGuestCredits = async (userId) => {
         try {
