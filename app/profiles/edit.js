@@ -11,7 +11,7 @@ import TTButton from "../../src/components/ui/TTButton";
 import { useTTTheme, useGlobalStyles, makeEditStyles } from "../../src/theme/globalStyles";
 import { makeImageDataUrlFree } from "../../src/services/imageDataUrl";
 import { classifyPetTypeFromServer } from "../../src/services/ai";
-import { getPets, upsertPet, calculateAge } from "../../src/services/pets";
+import { getPets, upsertPet, deletePet, calculateAge } from "../../src/services/pets";
 import { hexToRgba } from "../../src/utils/color";
 import { VIBES, PET_TYPES } from "../../src/config";
 import { useTTAlert } from "../../src/components/ui/TTAlert";
@@ -227,6 +227,28 @@ export default function EditPetScreen() {
             (petType !== "unknown" || classifyAttemptedRef.current) &&
             !!birthDate
         , [name, avatarUri, petTypeLoading, petType, birthDate]);
+
+    const onDelete = useCallback(() => {
+        alert(
+            "Delete profile?",
+            `This removes ${name || "this pet"} from profiles.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete", style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await deletePet(id);
+                            debouncedPushSync(deviceId);
+                            router.replace("/profiles");
+                        } catch (e) {
+                            alert("Delete failed", e?.message || "Couldn't delete profile.");
+                        }
+                    },
+                },
+            ]
+        );
+    }, [name, id, deviceId]);
 
     const onSave = useCallback(async () => {
         const trimmed = String(name || "").trim();
@@ -455,6 +477,14 @@ export default function EditPetScreen() {
                     disabled={!canSave}
                     style={styles.primaryBtn}
                 />
+                {isEdit && (
+                    <TTButton
+                        variant="danger"
+                        title="Delete Profile"
+                        onPress={onDelete}
+                        style={[styles.primaryBtn, { marginTop: 12 }]}
+                    />
+                )}
             </ScrollView>
 
             <Modal visible={vibeModalOpen} transparent animationType="fade" onRequestClose={() => setVibeModalOpen(false)}>

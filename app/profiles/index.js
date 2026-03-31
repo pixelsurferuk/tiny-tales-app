@@ -245,15 +245,7 @@ export default function ProfilesScreen() {
                                             style={[styles.actionBtnBase, styles.actionBtnEdit]}
                                             hitSlop={10}
                                         >
-                                            <Text style={[styles.actionBtnLabel, styles.actionBtnEditText]}>Edit</Text>
-                                        </Pressable>
-
-                                        <Pressable
-                                            onPress={() => onDelete(pet)}
-                                            style={[styles.actionBtnBase, styles.actionBtnDelete]}
-                                            hitSlop={10}
-                                        >
-                                            <Text style={[styles.actionBtnLabel, styles.actionBtnDeleteText]}>Delete</Text>
+                                            <Ionicons name="settings-outline" size={18} color={t.colors.textOverSuccess ?? t.colors.text} />
                                         </Pressable>
                                     </View>
                                 </Pressable>
