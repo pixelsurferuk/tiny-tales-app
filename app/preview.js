@@ -139,15 +139,6 @@ export default function Preview() {
                 pet: summarizePetForPrompt(activePet),
             });
 
-            if (!r?.ok) {
-                if (CREDIT_ERROR_CODES.has(r?.error)) {
-                    tryWatchAd();
-                    return;
-                }
-                alert("Thought Error", "Couldn't generate a thought.");
-                return;
-            }
-
             setThought(r?.thought || pickOfflineThought());
 
             const patch = parseCreditsFromResponse(r);
@@ -159,6 +150,11 @@ export default function Preview() {
             setServerOnline(true);
 
         } catch (e) {
+            const errCode = e?.data?.error;
+            if (CREDIT_ERROR_CODES.has(errCode)) {
+                if (!justWatchedAdRef.current) tryWatchAd();
+                return;
+            }
             setServerOnline(false);
             setThought(pickOfflineThought());
         } finally {
