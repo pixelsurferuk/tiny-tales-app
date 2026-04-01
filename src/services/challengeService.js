@@ -41,10 +41,24 @@ export function daysBetween(dateA, dateB) {
     return Math.round(Math.abs((b - a) / (1000 * 60 * 60 * 24)));
 }
 
-// ─── Trial — purely server-side ───────────────────────────────────────────────
+// ─── Trial — global local cache ───────────────────────────────────────────────
 // challenge_trial_started_at lives in device_usage on the server.
-// Transferred guest → user on sign in via transfer_guest_credits RPC.
-// No local storage — always use the date returned from /challenge/today.
+// We cache it in a single global key (not per-pet) so clearing a pet's
+// challenge data never loses the trial start date.
+
+const GLOBAL_TRIAL_STARTED_KEY = "tiny_tales_challenge_trial_started_at";
+
+export async function getGlobalTrialStartedAt() {
+    try {
+        return await AsyncStorage.getItem(GLOBAL_TRIAL_STARTED_KEY);
+    } catch {
+        return null;
+    }
+}
+
+export async function saveGlobalTrialStartedAt(date) {
+    if (date) await AsyncStorage.setItem(GLOBAL_TRIAL_STARTED_KEY, date);
+}
 
 export function getGlobalDaysLeft(serverStartDate) {
     if (!serverStartDate) return CHALLENGE_FREE_DAYS;

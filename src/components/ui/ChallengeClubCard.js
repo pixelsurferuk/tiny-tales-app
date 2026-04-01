@@ -18,7 +18,7 @@ import { useEntitlements } from "../../state/entitlements";
 import { getPets } from "../../services/pets";
 import {
     getLocalStreak, getTodayChallenge,
-    getGlobalDaysLeft,
+    getGlobalDaysLeft, getGlobalTrialStartedAt,
 } from "../../services/challengeService";
 import TTButton from "./TTButton";
 
@@ -50,9 +50,10 @@ export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
                 };
             }));
 
-            // trialStartedAt comes from challenge data — same source of truth as challenge.js
-            const trialStartedAt = summaries.find(s => s.trialStartedAt)?.trialStartedAt
-                || server?.challengeTrialStartedAt
+            // Global trial key is the source of truth — survives per-pet cache clears
+            const trialStartedAt = server?.challengeTrialStartedAt
+                || await getGlobalTrialStartedAt()
+                || summaries.find(s => s.trialStartedAt)?.trialStartedAt
                 || null;
             setMinDaysLeft(getGlobalDaysLeft(trialStartedAt));
 

@@ -19,6 +19,7 @@ import {
     getTodayChallenge, saveTodayChallenge,
     todayUTC,
     getGlobalDaysLeft, getBadgeTier, clearLocalChallengeData,
+    getGlobalTrialStartedAt, saveGlobalTrialStartedAt,
 } from "../src/services/challengeService";
 import { useTTAlert } from "../src/components/ui/TTAlert";
 import { AppBannerAd } from "../src/ads/admob";
@@ -70,8 +71,10 @@ export default function PetChallengeClub() {
             setStreak(localStreak);
             setBadges(localBadges);
 
-            // Global trial state — server.challengeTrialStartedAt is the source of truth
-            const globalTrialDate = server?.challengeTrialStartedAt || null;
+            // Global trial state — prefer server entitlements, then global local cache
+            const globalTrialDate = server?.challengeTrialStartedAt
+                || await getGlobalTrialStartedAt()
+                || null;
             if (globalTrialDate) {
                 setGlobalDaysLeft(getGlobalDaysLeft(globalTrialDate));
             }
@@ -83,8 +86,9 @@ export default function PetChallengeClub() {
                     setCompleted(true);
                     setReaction(cached.reaction || null);
                 }
-                // Use cached trialStartedAt only if server didn't provide one
+                // Save trialStartedAt to global key if not already stored
                 if (!globalTrialDate && cached.trialStartedAt) {
+                    await saveGlobalTrialStartedAt(cached.trialStartedAt);
                     setGlobalDaysLeft(getGlobalDaysLeft(cached.trialStartedAt));
                 }
                 setLoading(false);
@@ -95,9 +99,12 @@ export default function PetChallengeClub() {
             const ageRange = getAgeRangeFromLabel(pet.age);
             const result = await fetchTodayChallenge(identityId, pet.id, pet.petType || "pet", ageRange);
 
-            // Fall back to trialStartedAt from challenge fetch if server status didn't have it
-            if (!globalTrialDate && result.trialStartedAt) {
-                setGlobalDaysLeft(getGlobalDaysLeft(result.trialStartedAt));
+            // Save trialStartedAt to global key so it survives future cache clears
+            if (result.trialStartedAt) {
+                await saveGlobalTrialStartedAt(result.trialStartedAt);
+                if (!globalTrialDate) {
+                    setGlobalDaysLeft(getGlobalDaysLeft(result.trialStartedAt));
+                }
             }
 
             setChallenge(result.challenge);
