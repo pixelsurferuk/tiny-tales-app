@@ -1,6 +1,6 @@
 // src/components/ui/ChallengeClubCard.js
 import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Image } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -47,6 +47,7 @@ export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
                     streak: streak.count || 0,
                     todayDone: !!(cached?.completedAt),
                     trialStartedAt: cached?.trialStartedAt || null,
+                    avatarUri: pet.avatarUri || null,
                 };
             }));
 
@@ -148,26 +149,33 @@ export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
                                 borderBottomWidth: 1, borderBottomColor: border,
                             }}
                         >
-                            <View style={{
-                                width: 45,
-                                height: 45,
-                                borderRadius: 999,
-                                backgroundColor: t.colors.primary + "20",
-                                alignItems: "center",
-                                justifyContent: "center",
-                            }}>
-                                {Number(pet.streak) > 0 && getBadgeTier(pet.streak)?.emoji ? (
-                                    <Text style={{ fontSize: 21 }}>
-                                        {getBadgeTier(pet.streak)?.emoji}
-                                    </Text>
-                                ) : (
-                                    <Ionicons name="paw" size={17} color={t.colors.primary} />
-                                )}
-                            </View>
+                            {pet.avatarUri ? (
+                                <Image
+                                    source={{ uri: pet.avatarUri }}
+                                    style={{ width: 45, height: 45, borderRadius: 999 }}
+                                />
+                            ) : (
+                                <View style={{
+                                    width: 45,
+                                    height: 45,
+                                    borderRadius: 999,
+                                    backgroundColor: t.colors.primary + "20",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                }}>
+                                    {Number(pet.streak) > 0 && getBadgeTier(pet.streak)?.emoji ? (
+                                        <Text style={{ fontSize: 21 }}>
+                                            {getBadgeTier(pet.streak)?.emoji}
+                                        </Text>
+                                    ) : (
+                                        <Ionicons name="paw" size={17} color={t.colors.primary} />
+                                    )}
+                                </View>
+                            )}
                             <View style={{ flex: 1 }}>
                                 <Text style={[g.subTitle, { fontSize: 18, marginBottom: -4 }]}>{pet.name}</Text>
                                 <Text style={[g.text, {fontSize: 13}]}>
-                                    {pet.streak > 0 ? `${pet.streak} day streak` : "No streak yet — start today!"}
+                                    {getBadgeTier(pet.streak)?.emoji}{pet.streak > 0 ? ` ${pet.streak} day streak` : "No streak yet — start today!"}
                                 </Text>
                             </View>
                             {pet.todayDone ? (
