@@ -47,22 +47,13 @@ const palettes = {
         colors: {
 
             primary: "#7BC8A4",
-            textOverPrimary: "#FFFFFF",
+            textOverPrimary: "#1e1f27",
             secondary: "#FFD6A5",
-            textOverSecondary: "#2D2D35",
-            third: "#FF8FA3",
-            textOverThird: "#2D2D35",
-            fourth: "#FFF1E6",
-            textOverFourth: "#1B1F2A",
-
-            /*primary: "#009688",
-            textOverPrimary: "#FFFFFF",
-            secondary: "#00BCD4",
-            textOverSecondary: "#00363A",
-            third: "#FF7043",
-            textOverThird: "#FFFFFF",
-            fourth: "#E0F7FA",
-            textOverFourth: "#1B1F2A",*/
+            textOverSecondary: "#1e1f27",
+            third: "#E0F7FA",
+            textOverThird: "#1e1f27",
+            fourth: "#FF8FA3",
+            textOverFourth: "#1e1f27",
 
             bg: "#eeedf3",
             surface: "#FFFFFF",
@@ -83,13 +74,13 @@ const palettes = {
         colors: {
 
             primary: "#7BC8A4",
-            textOverPrimary: "#FFFFFF",
+            textOverPrimary: "#1e1f27",
             secondary: "#FFD6A5",
-            textOverSecondary: "#2D2D35",
-            third: "#FF8FA3",
-            textOverThird: "#2D2D35",
-            fourth: "#FFF1E6",
-            textOverFourth: "#1B1F2A",
+            textOverSecondary: "#1e1f27",
+            third: "#E0F7FA",
+            textOverThird: "#1e1f27",
+            fourth: "#FF8FA3",
+            textOverFourth: "#1e1f27",
 
             bg: "#1e1f27",
             surface: "#2d2d35",

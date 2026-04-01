@@ -66,7 +66,7 @@ export default function HomeScreen() {
 
                         <View style={styles.featureRow}>
                             <FeaturePill icon="chatbubbles-outline" label="Chat to Pets"  />
-                            <FeaturePill icon="camera-outline" label="Get pet Thoughts"/>
+                            <FeaturePill icon="camera-outline" label="Get Pet Thoughts"/>
                             <FeaturePill icon="heart-outline" label="Pet Profiles"  />
                             <FeaturePill icon="trophy-outline" label="Pet Challenges" />
                             <FeaturePill icon="ribbon-outline" label="Training Tips"  />
