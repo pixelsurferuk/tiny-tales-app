@@ -19,7 +19,7 @@ import { useTTAlert } from "../src/components/ui/TTAlert";
 function getSourceCopy(source) {
     if (source === "chat") return { title: "Out of credits", subtitle: "Buy more credits to keep chatting with your pet." };
     if (source === "thoughts") return { title: "Out of credits", subtitle: "Top up your credits to generate more thoughts." };
-    return { title: "Get More From Tiny Tales", subtitle: "Buy credits for thoughts and chats." };
+    return { title: "Get More From Companio", subtitle: "Buy credits for thoughts and chats." };
 }
 
 function Benefit({ icon, text, styles }) {
@@ -214,7 +214,7 @@ export default function Paywall() {
             await Purchases.purchasePackage(monthlyPkg);
             await refreshAll({ reason: "sub_purchase_fast", retries: 1, delayMs: 450 });
             await refreshAll({ reason: "sub_purchase_confirm", retries: 2, delayMs: 650 });
-            alert("Unlocked ✅", "Tiny Tales Pro is active.", [
+            alert("Unlocked ✅", "Companio Pro is active.", [
                 { text: "OK", onPress: goBackSafe }
             ]);
         } catch (e) {
@@ -314,7 +314,7 @@ export default function Paywall() {
                     {SUBSCRIPTIONS_ENABLED && (
                         <View style={styles.proCard}>
                             <View style={styles.proHeaderRow}>
-                                <Text style={styles.proTitle}>Tiny Tales Pro</Text>
+                                <Text style={[g.subTitle, {marginBottom: 0}]}>Companio Pro</Text>
 
                             </View>
                             {/*<Text style={styles.proSubtitle}>Unlimited credits and no ads.</Text>*/}
@@ -328,7 +328,7 @@ export default function Paywall() {
                                 onPress={() => requireLogin(handleSubscribe)}
                                 disabled={isPro || loadingOffer || purchasingSub || anyBusy || (isLoggedIn && (!rcReady || !monthlyPkg))}
                                 loading={false}
-                                leftIcon={<Ionicons name="rocket" size={16} color={t.colors.textOverPrimary} />}
+                                leftIcon={<Ionicons name="rocket-outline" size={16} color={t.colors.textOverPrimary} />}
                             />
                             {isPro && (
                                 <Pressable onPress={handleManageSubscription} style={styles.manageSubBtn}>

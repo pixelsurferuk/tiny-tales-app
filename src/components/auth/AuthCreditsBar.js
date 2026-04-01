@@ -71,15 +71,16 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
                 <View style={[{
                     flexDirection: "row",
                     alignItems: "center",
+                    justifyContent: "space-between",
                     paddingHorizontal: 15,
                     paddingVertical: 10,
-                    gap: 15,
+                    gap: 40,
                     backgroundColor: t.colors.cardBG,
                     borderTopWidth: 0.5,
                     borderTopColor: t.colors.text + "22",
                 }, style]}>
 
-                    <Text style={[g.text, {flexShrink: 1, fontSize: 14, lineHeight: 20}]} numberOfLines={2}>
+                    <Text style={[g.text, {flexShrink: 1,  lineHeight: 20}]} numberOfLines={2}>
                         Watch 5 video ads and get 10 free credits daily.
                     </Text>
 
@@ -88,7 +89,7 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
                             variant="third"
                             title={isPro ? "Manage Subscription" : "Get Credits"}
                             onPress={() => router.push("/paywall")}
-                            style={{ flexShrink: 0, minHeight: 40, paddingHorizontal: 15 }}
+                            style={{ flexShrink: 0, minHeight: 40, paddingHorizontal: 30 }}
                         />
                     )}
 

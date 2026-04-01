@@ -306,8 +306,8 @@ export const makeHomeStyles = (t) =>
         },
         badgeText: {
             color: t.colors.textOverPrimary,
-            lineHeight: 48,
-            fontSize: 28,
+            lineHeight: 84,
+            fontSize: 48,
             fontFamily: t.fontFamily.logo,
             paddingBottom: 3,
             paddingHorizontal: 20
@@ -679,10 +679,10 @@ export const makePaywallStyles = (t) =>
             gap: 12,
         },
         freeCardLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-        freeIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: t.colors.third, alignItems: "center", justifyContent: "center" },
-        freeTitle: { color: t.colors.text, fontSize: 20, fontFamily: t.fontFamily.title },
+        freeIconWrap: { width: 50, height: 50, borderRadius: 999, backgroundColor: t.colors.third, alignItems: "center", justifyContent: "center" },
+        freeTitle: { color: t.colors.text, fontSize: 24, fontFamily: t.fontFamily.title },
         freeSubtitle: { color: t.colors.text, fontSize: 13, marginTop: 2 },
-        freeButton: { height: 41, borderRadius: t.radius.sm, backgroundColor: t.colors.third, alignItems: "center", justifyContent: "center" },
+        freeButton: { height: 48, borderRadius: t.radius.sm, backgroundColor: t.colors.third, alignItems: "center", justifyContent: "center" },
         freeButtonText: { fontSize: 17, fontFamily: t.fontFamily.title, color: t.colors.textOverSecondary },
         rewardStatusText: { color: t.colors.text, fontSize: 13, textAlign: "center", marginTop: 4 },
 

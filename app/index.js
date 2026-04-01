@@ -61,9 +61,9 @@ export default function HomeScreen() {
                         </View>
                         <View>
                           {/*  <Text style={g.title}>Your pet's world.</Text>*/}
-                            <Text style={g.text}>Build a deeper bond through challenges or explore training tips and brain-boosting games for happier, smarter pets.      </Text>
+                            <Text style={g.text}>“Track challenges, grow together, and strengthen your bond with your companion every day, a little further.” </Text>
                         </View>
-                        {/*<TTButton title="Get A Quick Pet Thought" onPress={() => router.push("/camera")} />*/}
+
                         <View style={styles.featureRow}>
                             <FeaturePill icon="chatbubbles-outline" label="Chat to Pets"  />
                             <FeaturePill icon="camera-outline" label="Get pet Thoughts"/>
@@ -73,25 +73,45 @@ export default function HomeScreen() {
                             <FeaturePill icon="heart-outline" label="Profiles"  />
                         </View>
                         {!isLoggedIn && (
-                            <LoginGateButton
-                                title="Sign in"
-                                variant="primary"
-                                gateTitle="Sign in to Tiny Tales"
-                                gateSubtitle="Keep your credits and pets saved across devices."
-                                onSuccess={() => {
-                                refreshAll({ reason: "index_login" });
-                                refreshPets();
-                                setLoginKey(k => k + 1);
-                            }}
-                            />
+                            <View style={{ marginTop: 10, flexDirection: "row", gap: 10 }}>
+                                <View style={{ flex: 1 }}>
+                                    <LoginGateButton
+                                        title="Sign in"
+                                        variant="primary"
+                                        gateTitle="Sign in to Companio"
+                                        gateSubtitle="Keep your credits and pets saved across devices."
+                                        onSuccess={() => {
+                                        refreshAll({ reason: "index_login" });
+                                        refreshPets();
+                                        setLoginKey(k => k + 1);
+                                    }}
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <TTButton variant="secondary" title="Get A Quick Pet Thought" onPress={() => router.push("/camera")} />
+                                </View>
+                            </View>
                         )}
                         {isLoggedIn && (
-                            <View style={{marginTop: 10}}>
-                                <TTButton
-                                    title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
-                                    variant="primary"
-                                    onPress={() => router.push(petCount > 0 ? "/profiles" : "/profiles/edit")}
-                                />
+                            <View style={{ marginTop: 10, flexDirection: "row", gap: 10 }}>
+                                <View style={{ flex: 1 }}>
+                                    <TTButton
+                                        title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
+                                        variant="primary"
+                                        leftIcon={<Ionicons name="heart-outline" size={18} color={t.colors.textOverPrimary} />}
+                                        onPress={() =>
+                                            router.push(petCount > 0 ? "/profiles" : "/profiles/edit")
+                                        }
+                                    />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <TTButton
+                                        title="Quick Pet Thought"
+                                        variant="secondary"
+                                        leftIcon={<Ionicons name="camera-outline" size={18} color={t.colors.textOverSecondary} />}
+                                        onPress={() => router.push("/camera")}
+                                    />
+                                </View>
                             </View>
                         )}
                     </View>

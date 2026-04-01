@@ -85,18 +85,17 @@ export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
             borderColor: border, padding: 16, gap: 12,
         }}>
             {/* Header */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 15, marginBottom: 10 }}>
+            <View style={{ flexDirection: "column", alignItems: "center", gap: 15, marginBottom: 10 }}>
                 <View style={{
                     width: 80, height: 80, borderRadius: 9999,
-                    backgroundColor: t.colors.primary + "20",
+                    backgroundColor: t.colors.primary,
                     alignItems: "center", justifyContent: "center",
                 }}>
-                    <Text style={{ fontSize: 30 }}>🏆</Text>
+                    <Ionicons name="trophy-outline" size={44} color={t.colors.textOverPrimary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={g.subTitle}>Pet Challenges</Text>
-                    {/* Description */}
-                    <Text style={g.text}>
+                    <Text style={[g.subTitle, {textAlign: "center"}]}>Pet Challenges</Text>
+                    <Text style={[g.text, {textAlign: "center"}]}>
                         {petCount === 0
                             ? "Set up a pet profile to start daily challenges and build a streak together!"
                             : trialOver

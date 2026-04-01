@@ -13,7 +13,7 @@ export const REWARDED_ADS_ENABLED = true;
 export const TEST_FORCE_NOT_PRO = false;
 export const TEST_FORCE_ZERO_CREDITS = false;
 export const SHARE_CAPTION_HEADLINE = "Check out what my pet is thinking! 😅";
-export const SHARE_CAPTION_BODY = "Try Tiny Tales: Search \"Tiny Tales your pet thoughts and chat app\" on {store}.";
+export const SHARE_CAPTION_BODY = "Try Companio: Search \"Companio your pet thoughts and chat app\" on {store}.";
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 export const API_FALLBACK_URL = "https://tiny-tales-oms6.onrender.com";

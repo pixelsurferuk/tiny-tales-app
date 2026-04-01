@@ -207,23 +207,24 @@ export default function PetChallengeClub() {
                         backgroundColor: t.colors.cardBG,
                         borderRadius: 12, padding: 12, borderWidth: 1,
                         borderColor: t.colors.text + "22",
-                        flexDirection: "row", alignItems: "center", gap: 10,
+                        flexDirection: "column", alignItems: "center", gap: 10,
                     }}>
-                        <Ionicons name="lock-closed-outline" size={20} color={t.colors.text} />
+
                         <View style={{ flex: 1 }}>
-                            <Text style={[g.subTitle, { fontSize: 13, marginBottom: 0 }]}>
-                                Challenges is Pro only
+                            <Text style={[g.subTitle, { fontSize: 22, marginBottom: 0 }]}>
+                                <Ionicons name="lock-closed-outline" size={24} color={t.colors.text} /> Challenges are Pro only
                             </Text>
-                            <Text style={[g.text, { fontSize: 12, opacity: 0.7 }]}>
+                            <Text style={[g.text]}>
                                 Subscribe to keep your streak alive and unlock daily challenges
                             </Text>
                         </View>
-                        <Pressable
+                        <TTButton
                             onPress={() => router.push("/paywall")}
-                            style={{ backgroundColor: t.colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}
+                            title="Subscribe to continue"
+                            style={{ width: "100%" }}
+                            leftIcon={<Ionicons name="lock-closed-outline" size={18} color={t.colors.textOverPrimary} />}
                         >
-                            <Text style={{ color: t.colors.textOverPrimary, fontWeight: "700", fontSize: 12 }}>Subscribe</Text>
-                        </Pressable>
+                        </TTButton>
                     </View>
                 ) : !isPro && inTrial ? (
                     <>
@@ -400,11 +401,13 @@ export default function PetChallengeClub() {
                                     }
                                 />
                             ) : (
-                                <TTButton
-                                    title="Subscribe to continue 🔥"
-                                    onPress={() => router.push("/paywall")}
-                                    leftIcon={<Ionicons name="lock-closed" size={18} color={t.colors.textOverPrimary} />}
-                                />
+                               <>
+                                   {/*<TTButton
+                                       title="Subscribe to continue"
+                                       onPress={() => router.push("/paywall")}
+                                       leftIcon={<Ionicons name="lock-closed-outline" size={18} color={t.colors.textOverPrimary} />}
+                                   />*/}
+                               </>
                             )
                         ) : (
                             <View style={{ alignItems: "center", paddingVertical: 8 }}>
@@ -414,7 +417,7 @@ export default function PetChallengeClub() {
                             </View>
                         )}
 
-                        {__DEV__ ? (
+                       {/* {__DEV__ ? (
                             <>
                                 <Pressable onPress={async () => {
                                     const fakeCount = 14;
@@ -435,7 +438,7 @@ export default function PetChallengeClub() {
                                     <Text style={{ color: "tomato", textAlign: "center" }}>DEV: Reset all challenge data</Text>
                                 </Pressable>
                             </>
-                        ) : null}
+                        ) : null}*/}
                     </View>
                 ) : null}
 

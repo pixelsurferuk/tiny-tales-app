@@ -366,7 +366,7 @@ export default function Ask() {
             if (Platform.OS === "ios") {
                 await Share.share({ url: uri });
             } else {
-                await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share Tiny Tales" });
+                await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share Companio" });
             }
         } catch { /* ignore */ }
     };
