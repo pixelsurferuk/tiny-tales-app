@@ -80,7 +80,7 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
                     borderTopColor: t.colors.text + "22",
                 }, style]}>
 
-                    <Text style={[g.text, {flexShrink: 1,  lineHeight: 20}]} numberOfLines={2}>
+                    <Text style={[g.text, {flexShrink: 1, fontSize: 14, lineHeight: 20}]} numberOfLines={2}>
                         Watch 5 video ads and get 10 free credits daily.
                     </Text>
 

@@ -67,10 +67,10 @@ export default function HomeScreen() {
                         <View style={styles.featureRow}>
                             <FeaturePill icon="chatbubbles-outline" label="Chat to Pets"  />
                             <FeaturePill icon="camera-outline" label="Get pet Thoughts"/>
+                            <FeaturePill icon="heart-outline" label="Pet Profiles"  />
+                            <FeaturePill icon="trophy-outline" label="Pet Challenges" />
                             <FeaturePill icon="ribbon-outline" label="Training Tips"  />
                             <FeaturePill icon="bulb-outline" label="Brain Games" />
-                            <FeaturePill icon="trophy-outline" label="Pet Challenges" />
-                            <FeaturePill icon="heart-outline" label="Profiles"  />
                         </View>
                         {!isLoggedIn && (
                             <View style={{ marginTop: 10, flexDirection: "row", gap: 10 }}>
@@ -80,6 +80,7 @@ export default function HomeScreen() {
                                         variant="primary"
                                         gateTitle="Sign in to Companio"
                                         gateSubtitle="Keep your credits and pets saved across devices."
+                                        iconTop={<Ionicons name="lock-closed-outline" size={32} color={t.colors.textOverPrimary} />}
                                         onSuccess={() => {
                                         refreshAll({ reason: "index_login" });
                                         refreshPets();
@@ -88,7 +89,12 @@ export default function HomeScreen() {
                                     />
                                 </View>
                                 <View style={{ flex: 1 }}>
-                                    <TTButton variant="secondary" title="Get A Quick Pet Thought" onPress={() => router.push("/camera")} />
+                                    <TTButton
+                                        variant="secondary"
+                                        title="Quick Pet Thought"
+                                        iconTop={<Ionicons name="camera-outline" size={32} color={t.colors.textOverSecondary} />}
+                                        onPress={() => router.push("/camera")}
+                                    />
                                 </View>
                             </View>
                         )}
@@ -98,7 +104,7 @@ export default function HomeScreen() {
                                     <TTButton
                                         title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
                                         variant="primary"
-                                        leftIcon={<Ionicons name="heart-outline" size={18} color={t.colors.textOverPrimary} />}
+                                        iconTop={<Ionicons name="heart-outline" size={32} color={t.colors.textOverPrimary} />}
                                         onPress={() =>
                                             router.push(petCount > 0 ? "/profiles" : "/profiles/edit")
                                         }
@@ -108,7 +114,7 @@ export default function HomeScreen() {
                                     <TTButton
                                         title="Quick Pet Thought"
                                         variant="secondary"
-                                        leftIcon={<Ionicons name="camera-outline" size={18} color={t.colors.textOverSecondary} />}
+                                        iconTop={<Ionicons name="camera-outline" size={32} color={t.colors.textOverSecondary} />}
                                         onPress={() => router.push("/camera")}
                                     />
                                 </View>

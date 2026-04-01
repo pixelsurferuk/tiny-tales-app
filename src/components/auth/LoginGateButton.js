@@ -6,11 +6,15 @@ import TTButton from "../ui/TTButton";
 import InlineLoginGate from "./InlineLoginGate";
 import { useTTTheme, makePaywallStyles } from "../../theme/globalStyles";
 import Screen from "../ui/Screen";
+import {Ionicons} from "@expo/vector-icons";
 
 export default function LoginGateButton({
         title = "Sign In",
         variant = "primary",
         style,
+        iconTop,
+        iconLeft,
+        iconRight,
         disabled = false,
         onSuccess,
         gateTitle = "Sign in to continue",
@@ -34,6 +38,9 @@ export default function LoginGateButton({
                 title={title}
                 variant={variant}
                 style={style}
+                iconTop={iconTop}
+                iconLeft={iconLeft}
+                iconRight={iconRight}
                 disabled={disabled}
                 onPress={() => setShowGate(true)}
             />

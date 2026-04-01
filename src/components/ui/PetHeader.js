@@ -60,7 +60,7 @@ export default function PetHeader({
                     style={[g.subTitle, { fontSize: 20,  marginTop: 5, flexShrink: 1 }]}
                     numberOfLines={1}
                 >
-                    {petName || "Your Pet"}
+                    {petName || ""}
                 </Text>
             </Pressable>
 
