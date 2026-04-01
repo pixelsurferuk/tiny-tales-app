@@ -8,6 +8,35 @@ const SYNC_DEBOUNCE_MS = 3000;
 
 let pushTimer = null;
 
+// ─── Chat helpers ─────────────────────────────────────────────────────────────
+
+const CHAT_PREFIX = "tiny_tales_chat_";
+
+async function getAllChatData() {
+    try {
+        const keys = await AsyncStorage.getAllKeys();
+        const chatKeys = keys.filter(k => k.startsWith(CHAT_PREFIX));
+        if (!chatKeys.length) return {};
+        const pairs = await AsyncStorage.multiGet(chatKeys);
+        const chats = {};
+        for (const [key, val] of pairs) {
+            try { chats[key.replace(CHAT_PREFIX, "")] = JSON.parse(val); } catch {}
+        }
+        return chats;
+    } catch {
+        return {};
+    }
+}
+
+async function restoreChatData(chats) {
+    if (!chats || typeof chats !== "object") return;
+    const pairs = Object.entries(chats).map(([petId, messages]) => [
+        `${CHAT_PREFIX}${petId}`,
+        JSON.stringify(messages),
+    ]);
+    if (pairs.length) await AsyncStorage.multiSet(pairs);
+}
+
 // ─── Challenge data helpers ───────────────────────────────────────────────────
 
 const STREAK_PREFIX = "tiny_tales_challenge_streak_";
@@ -122,10 +151,11 @@ function mergePets(localPets, remotePets) {
 export async function pushSync(identityId) {
     if (!identityId) return;
     try {
-        const [pets, seenTips, clubData] = await Promise.all([
+        const [pets, seenTips, clubData, chats] = await Promise.all([
             getPets(),
             getAllSeenTips(),
             getAllChallengeData(),
+            getAllChatData(),
         ]);
 
         const payload = {
@@ -133,6 +163,7 @@ export async function pushSync(identityId) {
             pets: pets.map(stripAvatarUri),
             seenTips,
             clubData,
+            chats,
         };
 
         const res = await fetch(`${API}/sync/push`, {
@@ -178,7 +209,7 @@ export async function pullSync(identityId) {
         const json = await res.json();
         if (!json.ok || !json.data) return null;
 
-        const { pets: remotePets, seenTips, clubData } = json.data;
+        const { pets: remotePets, seenTips, clubData, chats } = json.data;
 
         if (Array.isArray(remotePets) && remotePets.length > 0) {
             const localPets = await getPets();
@@ -197,6 +228,10 @@ export async function pullSync(identityId) {
 
         if (clubData && typeof clubData === "object") {
             await restoreChallengeData(clubData);
+        }
+
+        if (chats && typeof chats === "object") {
+            await restoreChatData(chats);
         }
 
         await AsyncStorage.setItem(SYNC_KEY, new Date().toISOString());
