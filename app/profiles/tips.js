@@ -88,6 +88,7 @@ export default function PetTipsScreen() {
                         <Text style={g.screenHeaderBtnText}>Back</Text>
                     </Pressable>
                     <Text style={[g.screenHeaderTitle, {flexShrink: 1}]} numberOfLines={2}>{pet?.name}'s Training Area</Text>
+                    <View style={{ width: 60 }} />
                 </View>
 
 

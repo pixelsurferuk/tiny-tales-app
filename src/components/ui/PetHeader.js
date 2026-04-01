@@ -23,24 +23,24 @@ export default function PetHeader({
             {/* Back button */}
             <Pressable
                 onPress={onBack || (() => router.back())}
-                style={g.screenHeaderBtn}
+                style={[g.screenHeaderBtn, {borderWidth: 0}]}
                 hitSlop={8}
             >
-                <Ionicons name="arrow-back" size={22} color={t.colors.text} />
+                <Ionicons name="arrow-back" size={24} color={t.colors.text} />
             </Pressable>
 
             {/* Pet avatar + name */}
             <Pressable
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, marginLeft: 4 }}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 15, marginLeft: -10 }}
                 onPress={onBack || (() => router.back())}
             >
                 {avatarUri ? (
                     <Image
                         source={{ uri: avatarUri }}
                         style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 18,
+                            width: 50,
+                            height: 50,
+                            borderRadius: 999,
                             backgroundColor: t.colors.cardBG,
                         }}
                     />
@@ -57,7 +57,7 @@ export default function PetHeader({
                     </View>
                 )}
                 <Text
-                    style={[g.subTitle, { fontSize: 17,  marginTop: 5, flexShrink: 1 }]}
+                    style={[g.subTitle, { fontSize: 20,  marginTop: 5, flexShrink: 1 }]}
                     numberOfLines={1}
                 >
                     {petName || "Your Pet"}
@@ -81,7 +81,7 @@ export default function PetHeader({
                     <Pressable
                         onPress={onShare}
                         disabled={disabled}
-                        style={[g.screenHeaderBtn, { alignItems: "center" }, disabled && { opacity: 0.4 }]}
+                        style={[g.screenHeaderBtn, { alignItems: "center", borderWidth: 0 }, disabled && { opacity: 0.4 }]}
                         hitSlop={8}
                     >
                         <Ionicons name="share-social-outline" size={22} color={t.colors.text} />
@@ -92,7 +92,7 @@ export default function PetHeader({
                     <Pressable
                         onPress={onDownload}
                         disabled={disabled}
-                        style={[g.screenHeaderBtn, { alignItems: "center" }, disabled && { opacity: 0.4 }]}
+                        style={[g.screenHeaderBtn, { alignItems: "center",borderWidth: 0 }, disabled && { opacity: 0.4 }]}
                         hitSlop={8}
                     >
                         <Ionicons name="download-outline" size={22} color={t.colors.text} />

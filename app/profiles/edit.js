@@ -299,6 +299,7 @@ export default function EditPetScreen() {
                     <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
                 <Text style={[g.screenHeaderTitle, {flexShrink: 1}]}>{title}</Text>
+                <View style={{ width: 60 }} />
             </View>
 
             <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

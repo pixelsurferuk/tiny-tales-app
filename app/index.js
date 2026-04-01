@@ -57,7 +57,7 @@ export default function HomeScreen() {
 
                     <View style={[styles.card, styles.heroCard]}>
                         <View style={styles.badge}>
-                            <Text style={[g.text, styles.badgeText]}>Tiny Tales</Text>
+                            <Text style={[g.text, styles.badgeText]}>Companio</Text>
                         </View>
                         <View>
                           {/*  <Text style={g.title}>Your pet's world.</Text>*/}

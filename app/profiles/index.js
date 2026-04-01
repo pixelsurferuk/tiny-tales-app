@@ -31,8 +31,8 @@ function PetActionGrid({ pet, onThought, onChat, t, g, actions: customActions })
         { key: "challenges", icon: "trophy-outline",           label: "Challenges", bg: t.colors.primary,    text: t.colors.textOverPrimary,    onPress: () => router.push({ pathname: "/challenge", params: { petId: pet.id } }) },
         { key: "tips",       icon: "ribbon-outline",           label: "Training",   bg: t.colors.secondary,  text: t.colors.textOverSecondary,  onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "training" } }) },
         /*{ key: "games",      icon: "extension-puzzle-outline", label: "Games",      bg: t.colors.success,    text: t.colors.textOverSuccess,    onPress: () => router.push({ pathname: "/profiles/tips", params: { petId: pet.id, tab: "activity" } }) },*/
-        { key: "thought",    icon: "bulb-outline",             label: "Thought",   bg: t.colors.third,      text: t.colors.textOverThird,      onPress: () => onThought(pet) },
         { key: "chat",       icon: "chatbubble-outline",       label: "Chat",       bg: t.colors.accent,     text: t.colors.textOverPrimary,    onPress: () => onChat(pet) },
+        { key: "thought",    icon: "bulb-outline",             label: "Thought",   bg: t.colors.third,      text: t.colors.textOverThird,      onPress: () => onThought(pet) },
     ];
 
     const actions = customActions ?? defaultActions;
@@ -239,7 +239,7 @@ export default function ProfilesScreen() {
                                     </View>
 
                                     <View style={g.flex}>
-                                        <Text style={[g.subTitle, { fontSize: 20, marginBottom: 0 }]} numberOfLines={1}>
+                                        <Text style={[g.subTitle, { fontSize: 20, marginBottom: -4 }]} numberOfLines={1}>
                                             {pet.name || "Unnamed"}
                                         </Text>
                                         <Text style={styles.sub} numberOfLines={1}>{pet.vibe || "Default voice"}</Text>
@@ -268,7 +268,7 @@ export default function ProfilesScreen() {
                                     >
                                         <View style={{ flex: 1 }}>
                                             <Text style={[g.subTitle, { fontSize: 14, color: t.colors.text, marginBottom: 0 }]}>
-                                                {cd.streak > 0 ? `${getBadgeTier(cd.streak)?.emoji ?? ""} ${cd.streak} Day Streak!` : "Start a challenge streak!"}
+                                                {cd.streak > 0 ? `${getBadgeTier(cd.streak)?.emoji ?? ""} ${cd.streak} day challenge streak!` : "Start a challenge streak!"}
                                             </Text>
                                         </View>
                                         {cd.todayDone ? (

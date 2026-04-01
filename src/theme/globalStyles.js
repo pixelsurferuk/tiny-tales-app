@@ -74,14 +74,14 @@ const palettes = {
             text: "#F5F7FF",
             textMuted: "rgba(245,247,255,0.7)",
             textOverPrimary: "#2d2d35",
-            textOverSecondary: "#2d2d35",
+            textOverSecondary: "#F5F7FF",
             textOverSuccess: "#2d2d35",
             textOverDanger: "#2d2d35",
             border: "rgba(255,255,255,0.1)",
             primary: "#5dd5c9",
             secondary: "#9675ce",
             third: "#E8637A",
-            textOverThird: "#2d2d35",
+            textOverThird: "#F5F7FF",
             accent: "#f8db46",
             success: "#51c17b",
             danger: "#EF4444",
@@ -165,7 +165,7 @@ export function useGlobalStyles(t) {
             backgroundColor: t.colors.cardBG,
             gap: 15,
         },
-        screenHeaderBtn: { paddingVertical: 10, paddingHorizontal: 10 },
+        screenHeaderBtn: { paddingVertical: 10, paddingHorizontal: 15, borderColor: t.colors.border, borderWidth: 1,  borderRadius: t.radius.md },
         screenHeaderBtnText: { color: t.colors.text, fontFamily: t.fontFamily.title },
         screenHeaderTitle: { fontSize: 18, color: t.colors.text, fontFamily: t.fontFamily.title },
 
@@ -340,7 +340,7 @@ export const makeProfilesStyles = (t) =>
         emptyTitle: { fontSize: 18, color: t.colors.text },
         emptySub: { marginTop: 8, marginBottom: 20, color: t.colors.textMuted, textAlign: "center" },
 
-        list: { padding: 16, paddingBottom: 28, gap: 12 },
+        list: { padding: 16, paddingBottom: 28, gap: 20 },
 
         card: {
             borderRadius: 18,

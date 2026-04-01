@@ -174,6 +174,7 @@ export default function PetChallengeClub() {
                         <Text style={g.screenHeaderBtnText}>Back</Text>
                     </Pressable>
                     <Text style={[g.screenHeaderTitle, {flexShrink: 1}]}>Pet Challenges</Text>
+                    <View style={{ width: 60 }} />
                 </View>
                 <View style={[g.center, { padding: 24 }]}>
                     <Text style={[g.subTitle, { textAlign: "center", marginBottom: 8 }]}>No pet profile yet</Text>
@@ -195,6 +196,7 @@ export default function PetChallengeClub() {
                     <Text style={g.screenHeaderBtnText}>Back</Text>
                 </Pressable>
                 <Text style={[g.screenHeaderTitle, {flexShrink: 1}]}>Pet Challenges</Text>
+                <View style={{ width: 60 }} />
             </View>
 
             <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }} showsVerticalScrollIndicator={false}>
