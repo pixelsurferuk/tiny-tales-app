@@ -107,10 +107,18 @@ export default function PetChallengeClub() {
                 }
             }
 
+            // Restore completed state from server if challenge was already done today
+            if (result.completedAt) {
+                setCompleted(true);
+                setReaction(result.reaction || null);
+            }
+
             setChallenge(result.challenge);
             await saveTodayChallenge(pet.id, {
                 ...result.challenge,
                 trialStartedAt: result.trialStartedAt,
+                completedAt: result.completedAt || null,
+                reaction: result.reaction || null,
             });
         } catch (e) {
             console.warn("[challenge] load error", e?.message);
