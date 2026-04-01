@@ -76,7 +76,7 @@ export default function HomeScreen() {
                             <LoginGateButton
                                 title="Sign in"
                                 variant="primary"
-                                gateTitle="Sign in to Tiny Tales"
+                                gateTitle="Sign in to Companio"
                                 gateSubtitle="Keep your credits and pets saved across devices."
                                 onSuccess={() => {
                                 refreshAll({ reason: "index_login" });

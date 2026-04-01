@@ -32,7 +32,7 @@ function getNextMilestone(count) {
 export default function PetChallengeClub() {
     const t = useTTTheme();
     const g = useGlobalStyles(t);
-    const { deviceId: identityId, isPro } = useEntitlements();
+    const { deviceId: identityId, isPro, server } = useEntitlements();
     const alert = useTTAlert();
     const params = useLocalSearchParams();
     const petIdParam = params?.petId ? String(params.petId) : null;
@@ -70,16 +70,22 @@ export default function PetChallengeClub() {
             setStreak(localStreak);
             setBadges(localBadges);
 
+            // Global trial state — server.challengeTrialStartedAt is the source of truth
+            const globalTrialDate = server?.challengeTrialStartedAt || null;
+            if (globalTrialDate) {
+                setGlobalDaysLeft(getGlobalDaysLeft(globalTrialDate));
+            }
+
             const cached = await getTodayChallenge(pet.id);
             if (cached) {
                 setChallenge(cached);
-                // Use cached trialStartedAt if available
-                if (cached.trialStartedAt) {
-                    setGlobalDaysLeft(getGlobalDaysLeft(cached.trialStartedAt));
-                }
                 if (cached.completedAt) {
                     setCompleted(true);
                     setReaction(cached.reaction || null);
+                }
+                // Use cached trialStartedAt only if server didn't provide one
+                if (!globalTrialDate && cached.trialStartedAt) {
+                    setGlobalDaysLeft(getGlobalDaysLeft(cached.trialStartedAt));
                 }
                 setLoading(false);
                 return;
@@ -89,13 +95,12 @@ export default function PetChallengeClub() {
             const ageRange = getAgeRangeFromLabel(pet.age);
             const result = await fetchTodayChallenge(identityId, pet.id, pet.petType || "pet", ageRange);
 
-            // trialStartedAt comes from server — source of truth
-            if (result.trialStartedAt) {
+            // Fall back to trialStartedAt from challenge fetch if server status didn't have it
+            if (!globalTrialDate && result.trialStartedAt) {
                 setGlobalDaysLeft(getGlobalDaysLeft(result.trialStartedAt));
             }
 
             setChallenge(result.challenge);
-            // Cache trialStartedAt alongside today's challenge
             await saveTodayChallenge(pet.id, {
                 ...result.challenge,
                 trialStartedAt: result.trialStartedAt,
@@ -105,7 +110,7 @@ export default function PetChallengeClub() {
         } finally {
             setLoading(false);
         }
-    }, [identityId, petIdParam]);
+    }, [identityId, petIdParam, server?.challengeTrialStartedAt]);
 
     useEffect(() => { load(); }, [load]);
 

@@ -105,8 +105,8 @@ export default function WatchAdButton({ disabled = false, compact = false, style
                     <Ionicons name="play-circle" size={20} color={t.colors.textOverThird} />
                 </View>
                 <View style={g.flex}>
-                    <Text style={styles.freeTitle}>Get 3 free credits</Text>
-                    <Text style={styles.freeSubtitle}>Watch a short video to earn 3 free credits.</Text>
+                    <Text style={styles.freeTitle}>Get 2 free credits</Text>
+                    <Text style={styles.freeSubtitle}>Watch a short video to earn 2 free credits.</Text>
                 </View>
             </View>
             <Pressable

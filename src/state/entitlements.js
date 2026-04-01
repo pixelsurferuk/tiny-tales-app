@@ -36,6 +36,7 @@ function normalizeServerStatus(s) {
         creditsRemaining,
         creditsTotal,
         creditsUsed,
+        challengeTrialStartedAt: s?.challenge_trial_started_at || null,
         raw: s || null,
     };
 }
