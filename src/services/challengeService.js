@@ -31,9 +31,16 @@ export function getBadgeTier(count) {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-export function todayUTC() {
-    return new Date().toISOString().slice(0, 10);
+export function todayLocal() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
 }
+
+// Keep todayUTC as an alias so existing call sites still work
+export const todayUTC = todayLocal;
 
 export function daysBetween(dateA, dateB) {
     const a = new Date(dateA);
@@ -131,7 +138,7 @@ export async function fetchTodayChallenge(identityId, petId, petType, ageRange) 
     const res = await fetch(`${API}/challenge/today`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identityId, petId, petType, ageRange }),
+        body: JSON.stringify({ identityId, petId, petType, ageRange, localDate: todayLocal() }),
     });
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) throw new Error("Server error");
@@ -144,7 +151,7 @@ export async function completeChallenge(identityId, petId, challengeId, petSumma
     const res = await fetch(`${API}/challenge/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identityId, petId, challengeId, pet: petSummary }),
+        body: JSON.stringify({ identityId, petId, challengeId, pet: petSummary, localDate: todayLocal() }),
     });
     const contentType = res.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) throw new Error("Server error");
