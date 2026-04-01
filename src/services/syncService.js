@@ -41,6 +41,7 @@ async function restoreChatData(chats) {
 
 const STREAK_PREFIX = "tiny_tales_challenge_streak_";
 const BADGES_PREFIX = "tiny_tales_challenge_badges_";
+const TODAY_PREFIX = "tiny_tales_challenge_today_";
 const GLOBAL_TRIAL_KEY = "tiny_tales_challenge_trial_days";
 
 async function getAllChallengeData() {
@@ -48,19 +49,23 @@ async function getAllChallengeData() {
         const keys = await AsyncStorage.getAllKeys();
         const streakKeys = keys.filter(k => k.startsWith(STREAK_PREFIX));
         const badgeKeys = keys.filter(k => k.startsWith(BADGES_PREFIX));
+        const todayKeys = keys.filter(k => k.startsWith(TODAY_PREFIX));
         const globalTrialRaw = await AsyncStorage.getItem(GLOBAL_TRIAL_KEY);
 
-        const allKeys = [...streakKeys, ...badgeKeys];
+        const allKeys = [...streakKeys, ...badgeKeys, ...todayKeys];
         const pairs = allKeys.length ? await AsyncStorage.multiGet(allKeys) : [];
 
         const streaks = {};
         const badges = {};
+        const todayChallenges = {};
         for (const [key, val] of pairs) {
             try {
                 if (key.startsWith(STREAK_PREFIX)) {
                     streaks[key.replace(STREAK_PREFIX, "")] = JSON.parse(val);
-                } else {
+                } else if (key.startsWith(BADGES_PREFIX)) {
                     badges[key.replace(BADGES_PREFIX, "")] = JSON.parse(val);
+                } else if (key.startsWith(TODAY_PREFIX)) {
+                    todayChallenges[key.replace(TODAY_PREFIX, "")] = JSON.parse(val);
                 }
             } catch {}
         }
@@ -68,20 +73,24 @@ async function getAllChallengeData() {
         return {
             streaks,
             badges,
+            todayChallenges,
             globalTrialDays: globalTrialRaw ? JSON.parse(globalTrialRaw) : [],
         };
     } catch {
-        return { streaks: {}, badges: {}, globalTrialDays: [] };
+        return { streaks: {}, badges: {}, todayChallenges: {}, globalTrialDays: [] };
     }
 }
 
-async function restoreChallengeData({ streaks, badges, globalTrialDays } = {}) {
+async function restoreChallengeData({ streaks, badges, todayChallenges, globalTrialDays } = {}) {
     const pairs = [];
     for (const [petId, val] of Object.entries(streaks || {})) {
         pairs.push([`${STREAK_PREFIX}${petId}`, JSON.stringify(val)]);
     }
     for (const [petId, val] of Object.entries(badges || {})) {
         pairs.push([`${BADGES_PREFIX}${petId}`, JSON.stringify(val)]);
+    }
+    for (const [petId, val] of Object.entries(todayChallenges || {})) {
+        pairs.push([`${TODAY_PREFIX}${petId}`, JSON.stringify(val)]);
     }
     if (pairs.length) await AsyncStorage.multiSet(pairs);
     if (globalTrialDays?.length) {
