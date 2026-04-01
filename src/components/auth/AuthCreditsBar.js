@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text } from "react-native";
 import { router } from "expo-router";
 
 import { useTTTheme, makeAuthCreditsBarStyles, useGlobalStyles } from "../../theme/globalStyles";
@@ -57,13 +57,7 @@ export default function AuthCreditsBar({ style, compact = false, homePage = fals
     }
 
     // ─── Full mode ────────────────────────────────────────────────────────────
-    if (!server?.loaded) {
-        return (
-            <View style={[styles.card, styles.wrap, style]}>
-                <ActivityIndicator color={t.colors.text} />
-            </View>
-        );
-    }
+    if (!server?.loaded) return null;
 
     return (
         <>
