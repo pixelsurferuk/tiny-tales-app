@@ -61,7 +61,7 @@ export default function HomeScreen() {
                         </View>
                         <View>
                           {/*  <Text style={g.title}>Your pet's world.</Text>*/}
-                            <Text style={g.text}>“Track challenges, grow together, and strengthen your bond with your companion every day, a little further.” </Text>
+                            <Text style={[g.subTitle, { fontSize: 19, lineHeight: 28}]}>Track challenges, grow together, and strengthen your bond with your companion every day.</Text>
                         </View>
 
                         <View style={styles.featureRow}>
@@ -102,7 +102,7 @@ export default function HomeScreen() {
                             <View style={{ marginTop: 10, flexDirection: "row", gap: 10 }}>
                                 <View style={{ flex: 1 }}>
                                     <TTButton
-                                        title={petCount > 0 ? "See Your Pet Profiles" : "Set Up A Pet Profile"}
+                                        title={petCount > 0 ? "Your Pet Profiles" : "Set Up A Pet Profile"}
                                         variant="primary"
                                         iconTop={<Ionicons name="heart-outline" size={32} color={t.colors.textOverPrimary} />}
                                         onPress={() =>

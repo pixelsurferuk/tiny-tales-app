@@ -70,7 +70,7 @@ export default function TTButton({
                             vText,
                             textStyle,
                             {
-                                fontSize: 12,
+                                fontSize: 13,
                                 textAlign: "center",
                             },
                         ]}

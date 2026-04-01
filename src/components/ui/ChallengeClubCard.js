@@ -163,19 +163,12 @@ export default function ChallengeClubCard({ petCount = 0, refreshKey = 0 }) {
                                     alignItems: "center",
                                     justifyContent: "center",
                                 }}>
-                                    {Number(pet.streak) > 0 && getBadgeTier(pet.streak)?.emoji ? (
-                                        <Text style={{ fontSize: 21 }}>
-                                            {getBadgeTier(pet.streak)?.emoji}
-                                        </Text>
-                                    ) : (
-                                        <Ionicons name="paw" size={17} color={t.colors.primary} />
-                                    )}
+                                    <Ionicons name="paw" size={17} color={t.colors.primary} />
                                 </View>
                             )}
                             <View style={{ flex: 1 }}>
                                 <Text style={[g.subTitle, { fontSize: 18, marginBottom: -4 }]}>{pet.name}</Text>
-                                <Text style={[g.text, {fontSize: 13}]}>
-                                    {getBadgeTier(pet.streak)?.emoji}{pet.streak > 0 ? ` ${pet.streak} day streak` : "No streak yet — start today!"}
+                                <Text style={[g.text, {fontSize: 15}]}>{pet.streak > 0 ? `${pet.streak} day streak` : "No streak yet — start today!"}  {getBadgeTier(pet.streak)?.emoji}
                                 </Text>
                             </View>
                             {pet.todayDone ? (
