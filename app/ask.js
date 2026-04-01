@@ -23,6 +23,7 @@ import { parseCreditsFromResponse } from "../src/utils/credits";
 import { setAndroidNavBarStyle } from "../src/utils/navBar";
 import { hexToRgba } from "../src/utils/color";
 import { useEntitlements } from "../src/state/entitlements";
+import { debouncedPushSync } from "../src/services/syncService";
 import { CHAT_STORAGE_LIMIT, CREDIT_ERROR_CODES } from "../src/config";
 import { useTTAlert } from "../src/components/ui/TTAlert";
 import { useAdGate } from "../src/ads/useAdGate";
@@ -146,9 +147,11 @@ function usePetChat(activePet, displayUri, { deviceId, isPro, onPaywall, onConsu
             AsyncStorage.setItem(
                 getChatKey(activePetId),
                 JSON.stringify(clean.slice(-CHAT_STORAGE_LIMIT))
-            ).catch(() => {});
+            ).then(() => {
+                if (deviceId) debouncedPushSync(deviceId);
+            }).catch(() => {});
         }
-    }, [messages, activePetId]);
+    }, [messages, activePetId, deviceId]);
 
     const sendMessage = useCallback(
         async (questionText) => {
